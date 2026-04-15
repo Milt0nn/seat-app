@@ -194,9 +194,15 @@ button:active { transform: scale(0.97); }
   font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;
 }
 .classroom-row {
-  display: grid; gap: 20px;
-  justify-items: center; align-items: center;
+  display: flex; gap: 20px; align-items: center;
+  justify-content: center;
 }
+.row-half {
+  display: flex; gap: 20px; align-items: center;
+  flex: 1; min-width: 0;
+}
+.row-half.left { justify-content: flex-end; }
+.row-half.right { justify-content: flex-start; }
 .table-unit {
   display: flex; background: var(--bg-input);
   border: 2px solid var(--border); border-radius: 10px;
@@ -1258,8 +1264,58 @@ function renderLayoutControls() {
   document.getElementById('balanceLR').checked = state.settings.balanceLeftRight;
 }
 
+function renderTableCellHTML(table) {
+  if (!table) return '';
+  let h = '<div class="table-wrapper">';
+  h += '<button class="remove-table-btn" onclick="removeTable(\'' + table.id + '\')">×</button>';
+  h += '<div class="table-unit ' + table.orientation + '">';
+  for (let i = 0; i < table.seats; i++) {
+    h += '<div class="seat empty-seat" style="cursor:default"></div>';
+  }
+  h += '</div>';
+  h += '<div class="table-config">';
+  h += '<button onclick="changeTableSeats(\'' + table.id + '\',-1)">−</button>';
+  h += '<span>' + table.seats + '</span>';
+  h += '<button onclick="changeTableSeats(\'' + table.id + '\',1)">+</button>';
+  h += '<button class="orientation-btn" onclick="toggleOrientation(\'' + table.id + '\')">' +
+       (table.orientation === 'horizontal' ? '橫' : '直') + '</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderEmptyCellHTML(cg, r) {
+  return '<div class="table-wrapper"><div class="empty-cell" onclick="addTable(' + cg + ',' + r + ')">+</div></div>';
+}
+
+function buildRowHTML(cols, r, tables, cellFn) {
+  var mid = Math.floor(cols / 2);
+  var hasCenter = cols % 2 === 1;
+  var html = '<div class="classroom-row">';
+  // Left half
+  html += '<div class="row-half left">';
+  for (var cg = 0; cg < mid; cg++) {
+    html += cellFn(cg, r, tables);
+  }
+  html += '</div>';
+  // Center column (odd)
+  if (hasCenter) {
+    html += cellFn(mid, r, tables);
+  }
+  // Right half
+  html += '<div class="row-half right">';
+  for (var cg2 = hasCenter ? mid + 1 : mid; cg2 < cols; cg2++) {
+    html += cellFn(cg2, r, tables);
+  }
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
 function renderLayoutPreview() {
   const container = document.getElementById('layoutPreview');
+  const scrollEl = container.querySelector('.classroom-container');
+  const savedScroll = scrollEl ? scrollEl.scrollLeft : 0;
   const cols = state.layout.columns || 0;
   const rows = state.layout.rows || 0;
   if (cols === 0 || rows === 0) {
@@ -1267,44 +1323,21 @@ function renderLayoutPreview() {
     return;
   }
   const tables = state.layout.tables;
-  const rowStyle = 'grid-template-columns:repeat(' + cols + ',auto)';
   let html = '<div class="classroom-container">';
   html += '<div class="classroom-grid">';
   html += '<div class="podium">講台</div>';
 
   for (let r = 0; r < rows; r++) {
-    html += '<div class="classroom-row" style="' + rowStyle + '">';
-    for (let cg = 0; cg < cols; cg++) {
-      const table = tables.find(t => t.columnGroup === cg && t.row === r);
-      if (!table) {
-        // Empty cell - show "+" button
-        html += '<div class="table-wrapper">';
-        html += '<div class="empty-cell" onclick="addTable(' + cg + ',' + r + ')">+</div>';
-        html += '</div>';
-        continue;
-      }
-      html += '<div class="table-wrapper">';
-      html += '<button class="remove-table-btn" onclick="removeTable(\'' + table.id + '\')">×</button>';
-      html += '<div class="table-unit ' + table.orientation + '">';
-      for (let i = 0; i < table.seats; i++) {
-        html += '<div class="seat empty-seat" style="cursor:default"></div>';
-      }
-      html += '</div>';
-      html += '<div class="table-config">';
-      html += '<button onclick="changeTableSeats(\'' + table.id + '\',-1)">−</button>';
-      html += '<span>' + table.seats + '</span>';
-      html += '<button onclick="changeTableSeats(\'' + table.id + '\',1)">+</button>';
-      html += '<button class="orientation-btn" onclick="toggleOrientation(\'' + table.id + '\')">' +
-              (table.orientation === 'horizontal' ? '橫' : '直') + '</button>';
-      html += '</div>';
-      html += '</div>';
-    }
-    html += '</div>';
+    html += buildRowHTML(cols, r, tables, function(cg, row) {
+      var table = tables.find(function(t) { return t.columnGroup === cg && t.row === row; });
+      return table ? renderTableCellHTML(table) : renderEmptyCellHTML(cg, row);
+    });
   }
   html += '</div>';
   html += '</div>';
   container.innerHTML = html;
-  equalizeGridColumns();
+  const newScrollEl = container.querySelector('.classroom-container');
+  if (newScrollEl) newScrollEl.scrollLeft = savedScroll;
 }
 
 function renderClassroomHTML(assignment, contextId, mini) {
@@ -1315,63 +1348,36 @@ function renderClassroomHTML(assignment, contextId, mini) {
   const gridCls = mini ? '' : 'classroom-grid';
   const miniCls = mini ? ' mini-classroom' : '';
   const containerId = 'cc_' + contextId.replace(/[^a-zA-Z0-9_]/g, '');
-  const rowStyle = 'grid-template-columns:repeat(' + cols + ',auto)';
 
   let html = '<div class="classroom-container" id="' + containerId + '">';
   html += '<div class="' + gridCls + miniCls + '">';
   html += '<div class="podium">講台</div>';
 
   for (let r = 0; r < rows; r++) {
-    html += '<div class="classroom-row" style="' + rowStyle + '">';
-    for (let cg = 0; cg < cols; cg++) {
-      const table = tables.find(t => t.columnGroup === cg && t.row === r);
+    html += buildRowHTML(cols, r, tables, function(cg, row) {
+      var table = tables.find(function(t) { return t.columnGroup === cg && t.row === row; });
       if (!table) {
-        // Empty placeholder to maintain grid alignment
-        html += '<div class="table-wrapper"><div class="empty-cell" style="opacity:0;cursor:default;min-height:48px"></div></div>';
-        continue;
+        return '<div class="table-wrapper"><div class="empty-cell" style="opacity:0;cursor:default;min-height:48px"></div></div>';
       }
-      html += '<div class="table-unit ' + table.orientation + '">';
-      const students = (assignment && assignment[table.id]) ? assignment[table.id] : [];
-      for (let i = 0; i < table.seats; i++) {
-        const student = students[i] || null;
-        const seatKey = table.id + '_s' + i;
-        const gender = getStudentGender(student);
-        const isSelected = selectedSeat && selectedSeat.key === seatKey && selectedSeat.context === contextId;
-        const selCls = isSelected ? ' selected' : '';
-        html += '<div class="seat ' + gender + selCls + '" data-seat="' + seatKey + '" data-context="' + contextId + '" onclick="handleSeatClick(\'' + seatKey + '\',\'' + contextId + '\')">';
-        html += (student || '');
-        html += '</div>';
+      var h = '<div class="table-unit ' + table.orientation + '">';
+      var students = (assignment && assignment[table.id]) ? assignment[table.id] : [];
+      for (var i = 0; i < table.seats; i++) {
+        var student = students[i] || null;
+        var seatKey = table.id + '_s' + i;
+        var gender = getStudentGender(student);
+        var isSelected = selectedSeat && selectedSeat.key === seatKey && selectedSeat.context === contextId;
+        var selCls = isSelected ? ' selected' : '';
+        h += '<div class="seat ' + gender + selCls + '" data-seat="' + seatKey + '" data-context="' + contextId + '" onclick="handleSeatClick(\'' + seatKey + '\',\'' + contextId + '\')">';
+        h += (student || '');
+        h += '</div>';
       }
-      html += '</div>';
-    }
-    html += '</div>';
+      h += '</div>';
+      return h;
+    });
   }
   html += '</div>';
   html += '</div>';
   return html;
-}
-
-function equalizeGridColumns() {
-  document.querySelectorAll('.classroom-grid, .mini-classroom').forEach(function(grid) {
-    const rows = grid.querySelectorAll('.classroom-row');
-    let maxW = 0;
-    rows.forEach(function(row) {
-      row.style.gridTemplateColumns = row.style.gridTemplateColumns.replace(/\d+px/g, 'auto');
-    });
-    requestAnimationFrame(function() {
-      rows.forEach(function(row) {
-        Array.from(row.children).forEach(function(cell) {
-          maxW = Math.max(maxW, cell.offsetWidth);
-        });
-      });
-      if (maxW > 0) {
-        rows.forEach(function(row) {
-          var n = row.children.length;
-          row.style.gridTemplateColumns = 'repeat(' + n + ',' + maxW + 'px)';
-        });
-      }
-    });
-  });
 }
 
 function renderMainSeating() {
@@ -1381,7 +1387,7 @@ function renderMainSeating() {
     return;
   }
   container.innerHTML = renderClassroomHTML(state.currentAssignment, 'main', false);
-  equalizeGridColumns();
+
 }
 
 function renderTempList() {
@@ -1403,7 +1409,7 @@ function renderTempList() {
     html += '</div>';
   });
   container.innerHTML = html;
-  equalizeGridColumns();
+
 }
 
 function renderSavedList() {
@@ -1429,7 +1435,7 @@ function renderSavedList() {
     html += '</div>';
   });
   container.innerHTML = html;
-  equalizeGridColumns();
+
 }
 
 function renderConstraintUI() {
