@@ -151,7 +151,25 @@ button:active { transform: scale(0.97); }
 .data-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .layout-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
 .layout-controls > div { display: flex; flex-direction: column; gap: 4px; }
-.layout-controls input[type="number"] { width: 60px; }
+.num-stepper {
+  display: flex; align-items: center; gap: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  overflow: hidden; background: var(--bg-input);
+}
+.num-stepper button {
+  width: 34px; height: 34px; border: none; border-radius: 0;
+  background: var(--bg-input); color: var(--text);
+  font-size: 1.1rem; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.num-stepper button:first-child { border-right: 1px solid var(--border); }
+.num-stepper button:last-child { border-left: 1px solid var(--border); }
+.num-stepper button:active { background: var(--accent-light); }
+.num-stepper span {
+  min-width: 36px; text-align: center; font-size: 0.95rem;
+  font-weight: 600; color: var(--text); user-select: none;
+}
 .layout-options { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
 .layout-options label {
   display: flex; align-items: center; gap: 6px;
@@ -216,6 +234,30 @@ button:active { transform: scale(0.97); }
   background: var(--accent-light); color: var(--accent);
   border: 1px solid var(--accent); cursor: pointer;
 }
+/* Empty cell / remove table */
+.empty-cell {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 60px; min-height: 54px;
+  border: 2px dashed var(--border); border-radius: 10px;
+  cursor: pointer; transition: all 0.15s;
+  color: var(--text-secondary); font-size: 1.5rem;
+  background: transparent;
+}
+.empty-cell:hover, .empty-cell:active {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-light);
+}
+.table-wrapper { position: relative; }
+.remove-table-btn {
+  position: absolute; top: -8px; right: -8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--danger); color: #fff;
+  border: none; font-size: 0.75rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; z-index: 2; padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.remove-table-btn:hover { transform: scale(1.15); }
 /* Chips */
 .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .chip {
@@ -413,9 +455,9 @@ button:active { transform: scale(0.97); }
     <section class="section">
       <h2>教室配置</h2>
       <div class="layout-controls">
-        <div><label>縱列組數</label><input type="number" id="layoutColumns" min="1" max="6" value="2" onchange="onLayoutChange()"></div>
-        <div><label>每組行數</label><input type="number" id="layoutRows" min="1" max="10" value="3" onchange="onLayoutChange()"></div>
-        <div><label>每桌人數</label><input type="number" id="defaultSeats" min="1" max="8" value="3" onchange="onDefaultSeatsChange()"></div>
+        <div><label>縱列組數</label><div class="num-stepper"><button onclick="adjustLayout('columns',-1)">−</button><span id="layoutColumnsVal">2</span><button onclick="adjustLayout('columns',1)">+</button></div></div>
+        <div><label>每組行數</label><div class="num-stepper"><button onclick="adjustLayout('rows',-1)">−</button><span id="layoutRowsVal">3</span><button onclick="adjustLayout('rows',1)">+</button></div></div>
+        <div><label>每桌人數</label><div class="num-stepper"><button onclick="adjustDefaultSeats(-1)">−</button><span id="defaultSeatsVal">3</span><button onclick="adjustDefaultSeats(1)">+</button></div></div>
       </div>
       <div class="layout-options">
         <label><input type="checkbox" id="allowEmpty" onchange="onSettingsChange()"> 允許空桌</label>
@@ -598,40 +640,45 @@ function importJSON(event) {
 }
 
 // --- Layout Management ---
-function generateTables(cols, rows, defaultSeats) {
-  const tables = [];
-  for (let cg = 0; cg < cols; cg++) {
-    for (let r = 0; r < rows; r++) {
-      tables.push({
-        id: 't' + cg + '_' + r,
-        columnGroup: cg,
-        row: r,
-        seats: defaultSeats || 3,
-        orientation: 'horizontal'
-      });
-    }
+let defaultSeats = 3;
+
+function adjustLayout(field, delta) {
+  if (field === 'columns') {
+    state.layout.columns = Math.max(1, Math.min(6, state.layout.columns + delta));
+  } else {
+    state.layout.rows = Math.max(1, Math.min(10, state.layout.rows + delta));
   }
-  return tables;
+  // Remove tables that fall outside new grid dimensions
+  state.layout.tables = state.layout.tables.filter(
+    t => t.columnGroup < state.layout.columns && t.row < state.layout.rows
+  );
+  saveState();
+  renderLayoutControls();
+  renderLayoutPreview();
 }
 
-function rebuildLayout() {
-  const cols = parseInt(document.getElementById('layoutColumns').value) || 2;
-  const rows = parseInt(document.getElementById('layoutRows').value) || 3;
-  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
-  state.layout.columns = cols;
-  state.layout.rows = rows;
-  state.layout.tables = generateTables(cols, rows, seats);
+function adjustDefaultSeats(delta) {
+  defaultSeats = Math.max(1, Math.min(8, defaultSeats + delta));
+  document.getElementById('defaultSeatsVal').textContent = defaultSeats;
+}
+
+function addTable(cg, row) {
+  const existing = state.layout.tables.find(t => t.columnGroup === cg && t.row === row);
+  if (existing) return;
+  const seats = defaultSeats;
+  state.layout.tables.push({
+    id: 't' + cg + '_' + row,
+    columnGroup: cg,
+    row: row,
+    seats: seats,
+    orientation: 'horizontal'
+  });
   saveState();
   renderLayoutPreview();
 }
 
-function onLayoutChange() {
-  rebuildLayout();
-}
-
-function onDefaultSeatsChange() {
-  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
-  state.layout.tables.forEach(t => { t.seats = seats; });
+function removeTable(tableId) {
+  state.layout.tables = state.layout.tables.filter(t => t.id !== tableId);
   saveState();
   renderLayoutPreview();
 }
@@ -1194,35 +1241,38 @@ function renderClassForm() {
 }
 
 function renderLayoutControls() {
-  document.getElementById('layoutColumns').value = state.layout.columns;
-  document.getElementById('layoutRows').value = state.layout.rows;
-  if (state.layout.tables.length > 0) {
-    document.getElementById('defaultSeats').value = state.layout.tables[0].seats;
-  }
+  document.getElementById('layoutColumnsVal').textContent = state.layout.columns;
+  document.getElementById('layoutRowsVal').textContent = state.layout.rows;
+  document.getElementById('defaultSeatsVal').textContent = defaultSeats;
   document.getElementById('allowEmpty').checked = state.settings.allowEmptyTables;
   document.getElementById('balanceLR').checked = state.settings.balanceLeftRight;
 }
 
 function renderLayoutPreview() {
   const container = document.getElementById('layoutPreview');
-  const tables = state.layout.tables;
-  if (tables.length === 0) {
-    container.innerHTML = '<div class="empty-state">請設定教室配置</div>';
+  const cols = state.layout.columns || 0;
+  const rows = state.layout.rows || 0;
+  if (cols === 0 || rows === 0) {
+    container.innerHTML = '<div class="empty-state">請設定縱列組數與每組行數</div>';
     return;
   }
-  const maxRow = Math.max(...tables.map(t => t.row), 0);
+  const tables = state.layout.tables;
   let html = '<div class="classroom-grid">';
   html += '<div class="podium">講台</div>';
 
-  for (let r = 0; r <= maxRow; r++) {
+  for (let r = 0; r < rows; r++) {
     html += '<div class="classroom-row">';
-    for (let cg = 0; cg < state.layout.columns; cg++) {
+    for (let cg = 0; cg < cols; cg++) {
       const table = tables.find(t => t.columnGroup === cg && t.row === r);
       if (!table) {
-        html += '<div class="table-wrapper"></div>';
+        // Empty cell - show "+" button
+        html += '<div class="table-wrapper">';
+        html += '<div class="empty-cell" onclick="addTable(' + cg + ',' + r + ')">+</div>';
+        html += '</div>';
         continue;
       }
       html += '<div class="table-wrapper">';
+      html += '<button class="remove-table-btn" onclick="removeTable(\'' + table.id + '\')">×</button>';
       html += '<div class="table-unit ' + table.orientation + '">';
       for (let i = 0; i < table.seats; i++) {
         html += '<div class="seat empty-seat" style="cursor:default"></div>';
@@ -1564,15 +1614,10 @@ function init() {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
 
-  // If no tables, generate defaults
-  if (state.layout.tables.length === 0) {
-    state.layout.columns = 2;
-    state.layout.rows = 3;
-    state.layout.tables = generateTables(2, 3, 3);
-    saveState();
-  }
+  // Ensure layout has dimensions (but no auto-generated tables)
+  if (!state.layout.columns) state.layout.columns = 2;
+  if (!state.layout.rows) state.layout.rows = 3;
 
-  // If no classes, don't create one automatically
   renderAll();
 }
 
