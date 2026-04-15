@@ -451,7 +451,7 @@ button:active { transform: scale(0.97); }
       <h2>座位表</h2>
       <div class="seating-controls">
         <button onclick="randomizeSeats()" class="btn-primary">隨機排座位</button>
-        <button onclick="openSaveModal()">儲存方案</button>
+        <button onclick="saveArrangement()">儲存方案</button>
       </div>
       <div id="levelInfo" class="level-info"></div>
       <div id="mainSeating"></div>
@@ -463,19 +463,6 @@ button:active { transform: scale(0.97); }
     </section>
   </div>
 </main>
-
-<!-- Save modal -->
-<div class="modal-overlay" id="saveModal">
-  <div class="modal">
-    <h3>儲存座位方案</h3>
-    <label>方案名稱</label>
-    <input type="text" id="saveName" placeholder="例：第一次換座位">
-    <div class="modal-actions">
-      <button onclick="closeSaveModal()">取消</button>
-      <button onclick="confirmSave()" class="btn-primary">儲存</button>
-    </div>
-  </div>
-</div>
 
 <!-- Confirm modal -->
 <div class="modal-overlay" id="confirmModal">
@@ -502,7 +489,8 @@ let state = {
   settings: { allowEmptyTables: false, balanceLeftRight: false, darkMode: false },
   savedArrangements: [],
   tempArrangements: [],
-  currentAssignment: null
+  currentAssignment: null,
+  currentConstraintLevel: null
 };
 
 let selectedSeat = null; // { key: 'tX_Y', context: 'main' | tempId }
@@ -769,18 +757,7 @@ function switchTab(idx) {
   }
 }
 
-// --- Modals ---
-function openSaveModal() {
-  if (!state.currentAssignment) {
-    alert('尚未產生座位表');
-    return;
-  }
-  document.getElementById('saveName').value = '';
-  document.getElementById('saveModal').classList.add('active');
-}
-function closeSaveModal() {
-  document.getElementById('saveModal').classList.remove('active');
-}
+// --- Modals & Save ---
 function closeConfirmModal() {
   document.getElementById('confirmModal').classList.remove('active');
   pendingConfirmAction = null;
@@ -789,20 +766,27 @@ function confirmAction() {
   if (pendingConfirmAction) pendingConfirmAction();
   closeConfirmModal();
 }
-function confirmSave() {
-  const name = document.getElementById('saveName').value.trim() || '未命名方案';
+function saveArrangement() {
+  if (!state.currentAssignment) {
+    alert('尚未產生座位表');
+    return;
+  }
+  const cls = getActiveClass();
+  const clsName = cls ? cls.name : '未命名';
+  const existingCount = state.savedArrangements.filter(a => a.classId === state.activeClassId).length;
+  const name = clsName + '-方案' + (existingCount + 1);
   const arrangement = {
     id: genId(),
     classId: state.activeClassId,
     name: name,
     timestamp: Date.now(),
+    constraintLevel: state.currentConstraintLevel,
     layoutSnapshot: deepCopy(state.layout),
     assignment: deepCopy(state.currentAssignment),
     tempArrangements: deepCopy(state.tempArrangements)
   };
   state.savedArrangements.push(arrangement);
   saveState();
-  closeSaveModal();
   renderSavedList();
   alert('已儲存方案「' + name + '」');
 }
@@ -1004,6 +988,15 @@ function shuffle(arr) {
   return a;
 }
 
+const LEVEL_NAMES = ['', '最嚴格（不可同桌、相鄰、對角線）', '允許對角線', '允許前後相鄰', '允許同桌', '無限制'];
+
+function showLevelInfo(level) {
+  const info = document.getElementById('levelInfo');
+  if (!level) { info.classList.remove('visible'); return; }
+  info.textContent = '限制等級：' + level + ' — ' + LEVEL_NAMES[level];
+  info.classList.add('visible');
+}
+
 function randomizeSeats() {
   const cls = getActiveClass();
   if (!cls) { alert('請先建立班級並輸入學生名單'); return; }
@@ -1096,10 +1089,8 @@ function randomizeSeats() {
     }
   }
 
-  const levelNames = ['', '最嚴格（不可同桌、相鄰、對角線）', '允許對角線', '允許前後相鄰', '允許同桌', '無限制'];
-  const info = document.getElementById('levelInfo');
-  info.textContent = '使用限制等級：' + usedLevel + ' — ' + levelNames[usedLevel];
-  info.classList.add('visible');
+  state.currentConstraintLevel = usedLevel;
+  showLevelInfo(usedLevel);
 
   saveState();
   renderMainSeating();
@@ -1331,6 +1322,10 @@ function renderSavedList() {
     const time = new Date(arr.timestamp).toLocaleString('zh-TW');
     html += '<div class="arrangement-card">';
     html += '<div class="card-header"><h4>' + arr.name + '</h4><span>' + time + '</span></div>';
+    if (arr.constraintLevel) {
+      html += '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px">限制等級：' +
+        arr.constraintLevel + ' — ' + (LEVEL_NAMES[arr.constraintLevel] || '') + '</div>';
+    }
     html += renderClassroomHTML(arr.assignment, 'saved_' + arr.id, true);
     html += '<div class="card-actions">';
     html += '<button class="btn-sm btn-primary" onclick="loadSaved(\'' + arr.id + '\')">載入</button>';
@@ -1434,27 +1429,40 @@ function renderConstraintSelects() { /* replaced by renderStudentPicker */ }
 // Part 4: Event Handlers & Initialization
 // ============================================================
 
+function findSeatEl(seatKey, contextId) {
+  return document.querySelector('.seat[data-seat="' + seatKey + '"][data-context="' + contextId + '"]');
+}
+
+function updateSeatEl(el, student) {
+  if (!el) return;
+  const gender = getStudentGender(student);
+  el.className = 'seat ' + gender;
+  el.textContent = student || '';
+}
+
+function setSeatSelected(el, on) {
+  if (!el) return;
+  if (on) el.classList.add('selected');
+  else el.classList.remove('selected');
+}
+
 function handleSeatClick(seatKey, contextId) {
   if (!selectedSeat) {
-    // Select this seat
     selectedSeat = { key: seatKey, context: contextId };
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), true);
     return;
   }
 
   if (selectedSeat.key === seatKey && selectedSeat.context === contextId) {
-    // Deselect
     selectedSeat = null;
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), false);
     return;
   }
 
   if (selectedSeat.context !== contextId) {
-    // Different context - switch selection
-    const oldCtx = selectedSeat.context;
+    setSeatSelected(findSeatEl(selectedSeat.key, selectedSeat.context), false);
     selectedSeat = { key: seatKey, context: contextId };
-    rerenderContext(oldCtx);
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), true);
     return;
   }
 
@@ -1467,15 +1475,20 @@ function handleSeatClick(seatKey, contextId) {
   const tableB = getSeatTableId(seatKey);
   const idxB = getSeatIndex(seatKey);
 
+  const prevEl = findSeatEl(selectedSeat.key, contextId);
+  const currEl = findSeatEl(seatKey, contextId);
+
   if (assignment[tableA] && assignment[tableB]) {
-    const temp = assignment[tableA][idxA];
+    const tmp = assignment[tableA][idxA];
     assignment[tableA][idxA] = assignment[tableB][idxB];
-    assignment[tableB][idxB] = temp;
+    assignment[tableB][idxB] = tmp;
   }
 
+  // Update only the two swapped seats in place (no full re-render)
+  updateSeatEl(prevEl, assignment[tableA][idxA]);
+  updateSeatEl(currEl, assignment[tableB][idxB]);
   selectedSeat = null;
   saveState();
-  rerenderContext(contextId);
 }
 
 function getAssignmentForContext(contextId) {
@@ -1483,14 +1496,6 @@ function getAssignmentForContext(contextId) {
   const temp = state.tempArrangements.find(t => t.id === contextId);
   if (temp) return temp.assignment;
   return null;
-}
-
-function rerenderContext(contextId) {
-  if (contextId === 'main') {
-    renderMainSeating();
-  } else {
-    renderTempList();
-  }
 }
 
 function loadTemp(tempId) {
@@ -1524,6 +1529,7 @@ function loadSaved(arrId) {
   const arr = state.savedArrangements.find(a => a.id === arrId);
   if (!arr) return;
   state.currentAssignment = deepCopy(arr.assignment);
+  state.currentConstraintLevel = arr.constraintLevel || null;
   state.tempArrangements = arr.tempArrangements ? deepCopy(arr.tempArrangements) : [];
   if (arr.layoutSnapshot) {
     state.layout = deepCopy(arr.layoutSnapshot);
@@ -1532,7 +1538,7 @@ function loadSaved(arrId) {
   saveState();
   switchTab(1);
   renderAll();
-  document.getElementById('levelInfo').classList.remove('visible');
+  showLevelInfo(state.currentConstraintLevel);
 }
 
 function deleteSaved(arrId) {
