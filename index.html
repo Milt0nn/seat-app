@@ -216,6 +216,30 @@ button:active { transform: scale(0.97); }
   background: var(--accent-light); color: var(--accent);
   border: 1px solid var(--accent); cursor: pointer;
 }
+/* Empty cell / remove table */
+.empty-cell {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 60px; min-height: 54px;
+  border: 2px dashed var(--border); border-radius: 10px;
+  cursor: pointer; transition: all 0.15s;
+  color: var(--text-secondary); font-size: 1.5rem;
+  background: transparent;
+}
+.empty-cell:hover, .empty-cell:active {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-light);
+}
+.table-wrapper { position: relative; }
+.remove-table-btn {
+  position: absolute; top: -8px; right: -8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--danger); color: #fff;
+  border: none; font-size: 0.75rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; z-index: 2; padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.remove-table-btn:hover { transform: scale(1.15); }
 /* Chips */
 .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .chip {
@@ -598,40 +622,41 @@ function importJSON(event) {
 }
 
 // --- Layout Management ---
-function generateTables(cols, rows, defaultSeats) {
-  const tables = [];
-  for (let cg = 0; cg < cols; cg++) {
-    for (let r = 0; r < rows; r++) {
-      tables.push({
-        id: 't' + cg + '_' + r,
-        columnGroup: cg,
-        row: r,
-        seats: defaultSeats || 3,
-        orientation: 'horizontal'
-      });
-    }
-  }
-  return tables;
-}
-
-function rebuildLayout() {
+function onLayoutChange() {
   const cols = parseInt(document.getElementById('layoutColumns').value) || 2;
   const rows = parseInt(document.getElementById('layoutRows').value) || 3;
-  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
   state.layout.columns = cols;
   state.layout.rows = rows;
-  state.layout.tables = generateTables(cols, rows, seats);
+  // Remove tables that fall outside new grid dimensions
+  state.layout.tables = state.layout.tables.filter(
+    t => t.columnGroup < cols && t.row < rows
+  );
   saveState();
   renderLayoutPreview();
 }
 
-function onLayoutChange() {
-  rebuildLayout();
+function onDefaultSeatsChange() {
+  // Only affects newly added tables; existing tables unchanged
+  saveState();
 }
 
-function onDefaultSeatsChange() {
+function addTable(cg, row) {
+  const existing = state.layout.tables.find(t => t.columnGroup === cg && t.row === row);
+  if (existing) return;
   const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
-  state.layout.tables.forEach(t => { t.seats = seats; });
+  state.layout.tables.push({
+    id: 't' + cg + '_' + row,
+    columnGroup: cg,
+    row: row,
+    seats: seats,
+    orientation: 'horizontal'
+  });
+  saveState();
+  renderLayoutPreview();
+}
+
+function removeTable(tableId) {
+  state.layout.tables = state.layout.tables.filter(t => t.id !== tableId);
   saveState();
   renderLayoutPreview();
 }
@@ -1205,24 +1230,29 @@ function renderLayoutControls() {
 
 function renderLayoutPreview() {
   const container = document.getElementById('layoutPreview');
-  const tables = state.layout.tables;
-  if (tables.length === 0) {
-    container.innerHTML = '<div class="empty-state">請設定教室配置</div>';
+  const cols = state.layout.columns || 0;
+  const rows = state.layout.rows || 0;
+  if (cols === 0 || rows === 0) {
+    container.innerHTML = '<div class="empty-state">請設定縱列組數與每組行數</div>';
     return;
   }
-  const maxRow = Math.max(...tables.map(t => t.row), 0);
+  const tables = state.layout.tables;
   let html = '<div class="classroom-grid">';
   html += '<div class="podium">講台</div>';
 
-  for (let r = 0; r <= maxRow; r++) {
+  for (let r = 0; r < rows; r++) {
     html += '<div class="classroom-row">';
-    for (let cg = 0; cg < state.layout.columns; cg++) {
+    for (let cg = 0; cg < cols; cg++) {
       const table = tables.find(t => t.columnGroup === cg && t.row === r);
       if (!table) {
-        html += '<div class="table-wrapper"></div>';
+        // Empty cell - show "+" button
+        html += '<div class="table-wrapper">';
+        html += '<div class="empty-cell" onclick="addTable(' + cg + ',' + r + ')">+</div>';
+        html += '</div>';
         continue;
       }
       html += '<div class="table-wrapper">';
+      html += '<button class="remove-table-btn" onclick="removeTable(\'' + table.id + '\')">×</button>';
       html += '<div class="table-unit ' + table.orientation + '">';
       for (let i = 0; i < table.seats; i++) {
         html += '<div class="seat empty-seat" style="cursor:default"></div>';
@@ -1564,15 +1594,10 @@ function init() {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
 
-  // If no tables, generate defaults
-  if (state.layout.tables.length === 0) {
-    state.layout.columns = 2;
-    state.layout.rows = 3;
-    state.layout.tables = generateTables(2, 3, 3);
-    saveState();
-  }
+  // Ensure layout has dimensions (but no auto-generated tables)
+  if (!state.layout.columns) state.layout.columns = 2;
+  if (!state.layout.rows) state.layout.rows = 3;
 
-  // If no classes, don't create one automatically
   renderAll();
 }
 
