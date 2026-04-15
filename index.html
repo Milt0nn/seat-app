@@ -180,14 +180,13 @@ button:active { transform: scale(0.97); }
 }
 /* Classroom grid */
 .classroom-container {
-  overflow: hidden; position: relative;
+  overflow-x: auto; overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
 }
 .classroom-grid {
   display: flex; flex-direction: column; gap: 6px;
-  align-items: center; justify-content: center;
-  width: fit-content; margin: 0 auto;
-  transform-origin: top center;
-  transition: transform 0.2s;
+  align-items: center;
+  width: fit-content; min-width: 100%;
 }
 .podium {
   background: var(--accent-light); color: var(--accent);
@@ -195,7 +194,8 @@ button:active { transform: scale(0.97); }
   font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;
 }
 .classroom-row {
-  display: flex; gap: 20px; justify-content: center; align-items: flex-start;
+  display: grid; gap: 20px;
+  justify-items: center; align-items: start;
 }
 .table-unit {
   display: flex; background: var(--bg-input);
@@ -1026,11 +1026,12 @@ function getGenderScore(seatKey, student, assignment, coords, cls) {
     if (!c) continue;
     const dx = Math.abs(c.x - myCoord.x);
     const dy = Math.abs(c.y - myCoord.y);
-    if ((dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0)) {
-      const theirGender = cls.boys.includes(st) ? 'M' : 'F';
-      if (theirGender !== myGender) score += 1;
-      else score -= 1;
-    }
+    if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) continue;
+    const theirGender = cls.boys.includes(st) ? 'M' : 'F';
+    // Direct neighbors (left/right/front/back) get double weight
+    const weight = (dx + dy === 1) ? 2 : 1;
+    if (theirGender !== myGender) score += weight;
+    else score -= weight;
   }
   return score;
 }
@@ -1266,12 +1267,13 @@ function renderLayoutPreview() {
     return;
   }
   const tables = state.layout.tables;
+  const rowStyle = 'grid-template-columns:repeat(' + cols + ',1fr)';
   let html = '<div class="classroom-container">';
   html += '<div class="classroom-grid">';
   html += '<div class="podium">講台</div>';
 
   for (let r = 0; r < rows; r++) {
-    html += '<div class="classroom-row">';
+    html += '<div class="classroom-row" style="' + rowStyle + '">';
     for (let cg = 0; cg < cols; cg++) {
       const table = tables.find(t => t.columnGroup === cg && t.row === r);
       if (!table) {
@@ -1302,7 +1304,6 @@ function renderLayoutPreview() {
   html += '</div>';
   html += '</div>';
   container.innerHTML = html;
-  autoScaleClassroom(container);
 }
 
 function renderClassroomHTML(assignment, contextId, mini) {
@@ -1313,13 +1314,14 @@ function renderClassroomHTML(assignment, contextId, mini) {
   const gridCls = mini ? '' : 'classroom-grid';
   const miniCls = mini ? ' mini-classroom' : '';
   const containerId = 'cc_' + contextId.replace(/[^a-zA-Z0-9_]/g, '');
+  const rowStyle = 'grid-template-columns:repeat(' + cols + ',1fr)';
 
   let html = '<div class="classroom-container" id="' + containerId + '">';
   html += '<div class="' + gridCls + miniCls + '">';
   html += '<div class="podium">講台</div>';
 
   for (let r = 0; r < rows; r++) {
-    html += '<div class="classroom-row">';
+    html += '<div class="classroom-row" style="' + rowStyle + '">';
     for (let cg = 0; cg < cols; cg++) {
       const table = tables.find(t => t.columnGroup === cg && t.row === r);
       if (!table) {
@@ -1348,31 +1350,6 @@ function renderClassroomHTML(assignment, contextId, mini) {
   return html;
 }
 
-function autoScaleClassroom(container) {
-  if (!container) return;
-  const grid = container.querySelector('.classroom-grid, .mini-classroom');
-  if (!grid) return;
-  // Reset scale first to measure natural size
-  grid.style.transform = 'none';
-  requestAnimationFrame(function() {
-    const cw = container.clientWidth;
-    const gw = grid.scrollWidth;
-    if (gw > cw && cw > 0) {
-      const scale = cw / gw;
-      grid.style.transform = 'scale(' + scale + ')';
-      grid.style.transformOrigin = 'top center';
-      container.style.height = (grid.scrollHeight * scale) + 'px';
-    } else {
-      grid.style.transform = 'none';
-      container.style.height = 'auto';
-    }
-  });
-}
-
-function autoScaleAll() {
-  document.querySelectorAll('.classroom-container').forEach(autoScaleClassroom);
-}
-
 function renderMainSeating() {
   const container = document.getElementById('mainSeating');
   if (!state.currentAssignment) {
@@ -1380,7 +1357,6 @@ function renderMainSeating() {
     return;
   }
   container.innerHTML = renderClassroomHTML(state.currentAssignment, 'main', false);
-  autoScaleClassroom(document.getElementById('cc_main'));
 }
 
 function renderTempList() {
@@ -1402,7 +1378,6 @@ function renderTempList() {
     html += '</div>';
   });
   container.innerHTML = html;
-  requestAnimationFrame(autoScaleAll);
 }
 
 function renderSavedList() {
@@ -1428,7 +1403,6 @@ function renderSavedList() {
     html += '</div>';
   });
   container.innerHTML = html;
-  requestAnimationFrame(autoScaleAll);
 }
 
 function renderConstraintUI() {
@@ -1664,7 +1638,6 @@ function init() {
   if (!state.layout.rows) state.layout.rows = 3;
 
   renderAll();
-  window.addEventListener('resize', autoScaleAll);
 }
 
 init();
