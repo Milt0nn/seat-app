@@ -229,13 +229,58 @@ button:active { transform: scale(0.97); }
   opacity: 0.7; margin-left: 2px;
 }
 .chip .remove:hover { opacity: 1; }
-/* Constraint add row */
-.constraint-row {
-  display: flex; gap: 6px; align-items: center;
-  flex-wrap: wrap; margin-bottom: 6px;
+/* Constraint mode tabs */
+.mode-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px;
 }
-.constraint-row select { width: auto; flex: 1; min-width: 80px; }
-.constraint-row .arrow { flex: 0; font-size: 1.1rem; color: var(--text-secondary); }
+.mode-tab {
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 0.8rem; font-weight: 500; cursor: pointer;
+  background: var(--bg-input); color: var(--text-secondary);
+  border: 1px solid var(--border); transition: all 0.15s;
+}
+.mode-tab.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+/* Student picker grid */
+.student-picker {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 8px 0; padding: 10px;
+  background: var(--bg-input); border-radius: 8px;
+  border: 1px solid var(--border);
+  max-height: 240px; overflow-y: auto;
+}
+.student-picker:empty::after {
+  content: '請先建立班級並輸入學生名單';
+  color: var(--text-secondary); font-size: 0.85rem;
+}
+.pick-chip {
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; user-select: none;
+  transition: all 0.15s; border: 2px solid transparent;
+}
+.pick-chip.boy { background: var(--boy); color: var(--boy-text); }
+.pick-chip.girl { background: var(--girl); color: var(--girl-text); }
+.pick-chip.picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  transform: scale(1.05);
+}
+.pick-chip.already {
+  opacity: 0.4; cursor: default; text-decoration: line-through;
+}
+.pick-actions {
+  display: flex; gap: 8px; align-items: center; margin: 8px 0;
+}
+.pick-count {
+  font-size: 0.8rem; color: var(--text-secondary);
+}
+.mode-hint {
+  font-size: 0.8rem; color: var(--text-secondary);
+  margin-bottom: 6px; font-style: italic;
+}
+.current-constraints { margin-top: 12px; }
 /* Seating controls */
 .seating-controls {
   display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
@@ -302,7 +347,8 @@ button:active { transform: scale(0.97); }
 /* Print */
 @media print {
   header, .tab-bar, .seating-controls, .card-actions,
-  .constraint-row, .data-buttons, .layout-controls,
+  .mode-tabs, .student-picker, .pick-actions, .mode-hint,
+  .data-buttons, .layout-controls,
   .layout-options, .orientation-btn, .table-config,
   .section:not(#seatingSection), button { display: none !important; }
   .tab-content { display: block !important; padding: 0; }
@@ -388,49 +434,24 @@ button:active { transform: scale(0.97); }
   <div class="tab-content" id="tab1">
     <section class="section">
       <h2>限制條件</h2>
-      <h3>不可相鄰</h3>
-      <div class="constraint-row">
-        <select id="noNearA"></select>
-        <span class="arrow">↔</span>
-        <select id="noNearB"></select>
-        <button onclick="addNoNearby()" class="btn-sm btn-primary">新增</button>
+      <div class="mode-tabs" id="modeTabs"></div>
+      <div id="modeHint" class="mode-hint"></div>
+      <div id="studentPicker" class="student-picker"></div>
+      <div class="pick-actions">
+        <button onclick="applyConstraintSelection()" class="btn-primary btn-sm" id="applyPickBtn">新增所選</button>
+        <span class="pick-count" id="pickCount"></span>
       </div>
-      <div id="noNearbyList" class="chip-list"></div>
-
-      <h3>必須坐前排</h3>
-      <div class="constraint-row">
-        <select id="mustFrontSelect"></select>
-        <button onclick="addRowConstraint('mustFrontRow')" class="btn-sm btn-primary">新增</button>
+      <div class="current-constraints">
+        <h3>目前限制</h3>
+        <div id="currentConstraintList"></div>
       </div>
-      <div id="mustFrontList" class="chip-list"></div>
-
-      <h3>必須坐後排</h3>
-      <div class="constraint-row">
-        <select id="mustBackSelect"></select>
-        <button onclick="addRowConstraint('mustBackRow')" class="btn-sm btn-primary">新增</button>
-      </div>
-      <div id="mustBackList" class="chip-list"></div>
-
-      <h3>不可坐前排</h3>
-      <div class="constraint-row">
-        <select id="notFrontSelect"></select>
-        <button onclick="addRowConstraint('notFrontRow')" class="btn-sm btn-primary">新增</button>
-      </div>
-      <div id="notFrontList" class="chip-list"></div>
-
-      <h3>不可坐後排</h3>
-      <div class="constraint-row">
-        <select id="notBackSelect"></select>
-        <button onclick="addRowConstraint('notBackRow')" class="btn-sm btn-primary">新增</button>
-      </div>
-      <div id="notBackList" class="chip-list"></div>
     </section>
 
     <section class="section" id="seatingSection">
       <h2>座位表</h2>
       <div class="seating-controls">
         <button onclick="randomizeSeats()" class="btn-primary">隨機排座位</button>
-        <button onclick="openSaveModal()">儲存方案</button>
+        <button onclick="saveArrangement()">儲存方案</button>
       </div>
       <div id="levelInfo" class="level-info"></div>
       <div id="mainSeating"></div>
@@ -442,19 +463,6 @@ button:active { transform: scale(0.97); }
     </section>
   </div>
 </main>
-
-<!-- Save modal -->
-<div class="modal-overlay" id="saveModal">
-  <div class="modal">
-    <h3>儲存座位方案</h3>
-    <label>方案名稱</label>
-    <input type="text" id="saveName" placeholder="例：第一次換座位">
-    <div class="modal-actions">
-      <button onclick="closeSaveModal()">取消</button>
-      <button onclick="confirmSave()" class="btn-primary">儲存</button>
-    </div>
-  </div>
-</div>
 
 <!-- Confirm modal -->
 <div class="modal-overlay" id="confirmModal">
@@ -481,11 +489,14 @@ let state = {
   settings: { allowEmptyTables: false, balanceLeftRight: false, darkMode: false },
   savedArrangements: [],
   tempArrangements: [],
-  currentAssignment: null
+  currentAssignment: null,
+  currentConstraintLevel: null
 };
 
 let selectedSeat = null; // { key: 'tX_Y', context: 'main' | tempId }
 let pendingConfirmAction = null;
+let constraintMode = 'noNearby'; // 'noNearby' | 'mustFrontRow' | 'mustBackRow' | 'notFrontRow' | 'notBackRow'
+let constraintPicked = new Set(); // currently picked student names
 
 // --- Utilities ---
 function genId() { return '_' + Math.random().toString(36).substr(2, 9); }
@@ -746,18 +757,7 @@ function switchTab(idx) {
   }
 }
 
-// --- Modals ---
-function openSaveModal() {
-  if (!state.currentAssignment) {
-    alert('尚未產生座位表');
-    return;
-  }
-  document.getElementById('saveName').value = '';
-  document.getElementById('saveModal').classList.add('active');
-}
-function closeSaveModal() {
-  document.getElementById('saveModal').classList.remove('active');
-}
+// --- Modals & Save ---
 function closeConfirmModal() {
   document.getElementById('confirmModal').classList.remove('active');
   pendingConfirmAction = null;
@@ -766,38 +766,104 @@ function confirmAction() {
   if (pendingConfirmAction) pendingConfirmAction();
   closeConfirmModal();
 }
-function confirmSave() {
-  const name = document.getElementById('saveName').value.trim() || '未命名方案';
+function saveArrangement() {
+  if (!state.currentAssignment) {
+    alert('尚未產生座位表');
+    return;
+  }
+  const cls = getActiveClass();
+  const clsName = cls ? cls.name : '未命名';
+  const existingCount = state.savedArrangements.filter(a => a.classId === state.activeClassId).length;
+  const name = clsName + '-方案' + (existingCount + 1);
   const arrangement = {
     id: genId(),
     classId: state.activeClassId,
     name: name,
     timestamp: Date.now(),
+    constraintLevel: state.currentConstraintLevel,
     layoutSnapshot: deepCopy(state.layout),
     assignment: deepCopy(state.currentAssignment),
     tempArrangements: deepCopy(state.tempArrangements)
   };
   state.savedArrangements.push(arrangement);
   saveState();
-  closeSaveModal();
   renderSavedList();
   alert('已儲存方案「' + name + '」');
 }
 
 // --- Constraint Management ---
-function addNoNearby() {
+const CONSTRAINT_MODES = [
+  { key: 'noNearby', label: '不可相鄰', hint: '選取多位學生，所選之間互相不可相鄰' },
+  { key: 'mustFrontRow', label: '必須前排', hint: '選取的學生必須坐在最前排' },
+  { key: 'mustBackRow', label: '必須後排', hint: '選取的學生必須坐在最後排' },
+  { key: 'notFrontRow', label: '不可前排', hint: '選取的學生不可坐在最前排' },
+  { key: 'notBackRow', label: '不可後排', hint: '選取的學生不可坐在最後排' }
+];
+
+function switchConstraintMode(mode) {
+  constraintMode = mode;
+  constraintPicked.clear();
+  renderConstraintUI();
+}
+
+function togglePickStudent(name) {
+  if (constraintPicked.has(name)) {
+    constraintPicked.delete(name);
+  } else {
+    constraintPicked.add(name);
+  }
+  renderStudentPicker();
+  updatePickCount();
+}
+
+function updatePickCount() {
+  const el = document.getElementById('pickCount');
+  const n = constraintPicked.size;
+  if (n === 0) { el.textContent = ''; return; }
+  if (constraintMode === 'noNearby') {
+    const pairs = n * (n - 1) / 2;
+    el.textContent = '已選 ' + n + ' 人（將產生 ' + pairs + ' 組配對）';
+  } else {
+    el.textContent = '已選 ' + n + ' 人';
+  }
+}
+
+function applyConstraintSelection() {
   const cls = getActiveClass();
-  if (!cls) return;
-  const a = document.getElementById('noNearA').value;
-  const b = document.getElementById('noNearB').value;
-  if (!a || !b || a === b) return;
-  const exists = cls.constraints.noNearby.some(
-    p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a)
-  );
-  if (exists) return;
-  cls.constraints.noNearby.push([a, b]);
+  if (!cls || constraintPicked.size === 0) return;
+  const names = Array.from(constraintPicked);
+
+  if (constraintMode === 'noNearby') {
+    if (names.length < 2) { alert('不可相鄰需選取至少 2 位學生'); return; }
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        const a = names[i], b = names[j];
+        const exists = cls.constraints.noNearby.some(
+          p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a)
+        );
+        if (!exists) cls.constraints.noNearby.push([a, b]);
+      }
+    }
+  } else {
+    const conflicts = {
+      mustFrontRow: ['mustBackRow', 'notFrontRow'],
+      mustBackRow: ['mustFrontRow', 'notBackRow'],
+      notFrontRow: ['mustFrontRow'],
+      notBackRow: ['mustBackRow']
+    };
+    names.forEach(name => {
+      (conflicts[constraintMode] || []).forEach(ct => {
+        cls.constraints[ct] = cls.constraints[ct].filter(n => n !== name);
+      });
+      if (!cls.constraints[constraintMode].includes(name)) {
+        cls.constraints[constraintMode].push(name);
+      }
+    });
+  }
+
+  constraintPicked.clear();
   saveState();
-  renderConstraints();
+  renderConstraintUI();
 }
 
 function removeNoNearby(idx) {
@@ -805,33 +871,7 @@ function removeNoNearby(idx) {
   if (!cls) return;
   cls.constraints.noNearby.splice(idx, 1);
   saveState();
-  renderConstraints();
-}
-
-function addRowConstraint(type) {
-  const cls = getActiveClass();
-  if (!cls) return;
-  const selectId = {
-    mustFrontRow: 'mustFrontSelect',
-    mustBackRow: 'mustBackSelect',
-    notFrontRow: 'notFrontSelect',
-    notBackRow: 'notBackSelect'
-  }[type];
-  const name = document.getElementById(selectId).value;
-  if (!name || cls.constraints[type].includes(name)) return;
-  // Remove from conflicting constraints
-  const conflicts = {
-    mustFrontRow: ['mustBackRow', 'notFrontRow'],
-    mustBackRow: ['mustFrontRow', 'notBackRow'],
-    notFrontRow: ['mustFrontRow'],
-    notBackRow: ['mustBackRow']
-  };
-  (conflicts[type] || []).forEach(ct => {
-    cls.constraints[ct] = cls.constraints[ct].filter(n => n !== name);
-  });
-  cls.constraints[type].push(name);
-  saveState();
-  renderConstraints();
+  renderCurrentConstraints();
 }
 
 function removeRowConstraint(type, name) {
@@ -839,7 +879,8 @@ function removeRowConstraint(type, name) {
   if (!cls) return;
   cls.constraints[type] = cls.constraints[type].filter(n => n !== name);
   saveState();
-  renderConstraints();
+  renderCurrentConstraints();
+  renderStudentPicker();
 }
 // ============================================================
 // Part 2: Coordinate System & Seating Algorithm
@@ -947,6 +988,15 @@ function shuffle(arr) {
   return a;
 }
 
+const LEVEL_NAMES = ['', '最嚴格（不可同桌、相鄰、對角線）', '允許對角線', '允許前後相鄰', '允許同桌', '無限制'];
+
+function showLevelInfo(level) {
+  const info = document.getElementById('levelInfo');
+  if (!level) { info.classList.remove('visible'); return; }
+  info.textContent = '限制等級：' + level + ' — ' + LEVEL_NAMES[level];
+  info.classList.add('visible');
+}
+
 function randomizeSeats() {
   const cls = getActiveClass();
   if (!cls) { alert('請先建立班級並輸入學生名單'); return; }
@@ -1039,10 +1089,8 @@ function randomizeSeats() {
     }
   }
 
-  const levelNames = ['', '最嚴格（不可同桌、相鄰、對角線）', '允許對角線', '允許前後相鄰', '允許同桌', '無限制'];
-  const info = document.getElementById('levelInfo');
-  info.textContent = '使用限制等級：' + usedLevel + ' — ' + levelNames[usedLevel];
-  info.classList.add('visible');
+  state.currentConstraintLevel = usedLevel;
+  showLevelInfo(usedLevel);
 
   saveState();
   renderMainSeating();
@@ -1274,6 +1322,10 @@ function renderSavedList() {
     const time = new Date(arr.timestamp).toLocaleString('zh-TW');
     html += '<div class="arrangement-card">';
     html += '<div class="card-header"><h4>' + arr.name + '</h4><span>' + time + '</span></div>';
+    if (arr.constraintLevel) {
+      html += '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px">限制等級：' +
+        arr.constraintLevel + ' — ' + (LEVEL_NAMES[arr.constraintLevel] || '') + '</div>';
+    }
     html += renderClassroomHTML(arr.assignment, 'saved_' + arr.id, true);
     html += '<div class="card-actions">';
     html += '<button class="btn-sm btn-primary" onclick="loadSaved(\'' + arr.id + '\')">載入</button>';
@@ -1284,78 +1336,133 @@ function renderSavedList() {
   container.innerHTML = html;
 }
 
-function renderConstraints() {
+function renderConstraintUI() {
+  renderModeTabs();
+  renderModeHint();
+  renderStudentPicker();
+  updatePickCount();
+  renderCurrentConstraints();
+}
+
+function renderModeTabs() {
+  const container = document.getElementById('modeTabs');
+  container.innerHTML = CONSTRAINT_MODES.map(m =>
+    '<button class="mode-tab' + (constraintMode === m.key ? ' active' : '') +
+    '" onclick="switchConstraintMode(\'' + m.key + '\')">' + m.label + '</button>'
+  ).join('');
+}
+
+function renderModeHint() {
+  const mode = CONSTRAINT_MODES.find(m => m.key === constraintMode);
+  document.getElementById('modeHint').textContent = mode ? mode.hint : '';
+}
+
+function renderStudentPicker() {
+  const container = document.getElementById('studentPicker');
   const cls = getActiveClass();
-  // No nearby
-  const nnList = document.getElementById('noNearbyList');
-  if (!cls || cls.constraints.noNearby.length === 0) {
-    nnList.innerHTML = '<span style="font-size:0.8rem;color:var(--text-secondary)">尚無設定</span>';
-  } else {
-    nnList.innerHTML = cls.constraints.noNearby.map((pair, i) =>
+  if (!cls) { container.innerHTML = ''; return; }
+
+  const students = getAllStudents(cls);
+  if (students.length === 0) { container.innerHTML = ''; return; }
+
+  // For row constraint modes, mark students already in this constraint
+  const alreadyIn = new Set();
+  if (constraintMode !== 'noNearby') {
+    (cls.constraints[constraintMode] || []).forEach(n => alreadyIn.add(n));
+  }
+
+  container.innerHTML = students.map(name => {
+    const gender = cls.boys.includes(name) ? 'boy' : 'girl';
+    const picked = constraintPicked.has(name) ? ' picked' : '';
+    const already = alreadyIn.has(name) ? ' already' : '';
+    return '<span class="pick-chip ' + gender + picked + already +
+      '" onclick="' + (alreadyIn.has(name) ? '' : 'togglePickStudent(\'' + name.replace(/'/g, "\\'") + '\')') +
+      '">' + name + '</span>';
+  }).join('');
+}
+
+function renderCurrentConstraints() {
+  const container = document.getElementById('currentConstraintList');
+  const cls = getActiveClass();
+  if (!cls) { container.innerHTML = '<div class="empty-state">請先建立班級</div>'; return; }
+
+  let html = '';
+  // noNearby
+  if (cls.constraints.noNearby.length > 0) {
+    html += '<h4 style="font-size:0.85rem;margin:8px 0 4px;color:var(--text-secondary)">不可相鄰</h4>';
+    html += '<div class="chip-list">';
+    html += cls.constraints.noNearby.map((pair, i) =>
       '<span class="chip">' + pair[0] + ' ↔ ' + pair[1] +
       '<span class="remove" onclick="removeNoNearby(' + i + ')">×</span></span>'
     ).join('');
+    html += '</div>';
   }
   // Row constraints
-  const types = [
-    { key: 'mustFrontRow', listId: 'mustFrontList' },
-    { key: 'mustBackRow', listId: 'mustBackList' },
-    { key: 'notFrontRow', listId: 'notFrontList' },
-    { key: 'notBackRow', listId: 'notBackList' }
+  const rowTypes = [
+    { key: 'mustFrontRow', label: '必須前排' },
+    { key: 'mustBackRow', label: '必須後排' },
+    { key: 'notFrontRow', label: '不可前排' },
+    { key: 'notBackRow', label: '不可後排' }
   ];
-  types.forEach(({ key, listId }) => {
-    const el = document.getElementById(listId);
-    if (!cls || cls.constraints[key].length === 0) {
-      el.innerHTML = '<span style="font-size:0.8rem;color:var(--text-secondary)">尚無設定</span>';
-    } else {
-      el.innerHTML = cls.constraints[key].map(name =>
+  rowTypes.forEach(({ key, label }) => {
+    if (cls.constraints[key].length > 0) {
+      html += '<h4 style="font-size:0.85rem;margin:8px 0 4px;color:var(--text-secondary)">' + label + '</h4>';
+      html += '<div class="chip-list">';
+      html += cls.constraints[key].map(name =>
         '<span class="chip">' + name +
-        '<span class="remove" onclick="removeRowConstraint(\'' + key + '\',\'' + name + '\')">×</span></span>'
+        '<span class="remove" onclick="removeRowConstraint(\'' + key + '\',\'' + name.replace(/'/g, "\\'") + '\')">×</span></span>'
       ).join('');
+      html += '</div>';
     }
   });
+  if (!html) {
+    html = '<div class="empty-state" style="padding:12px">尚無任何限制條件</div>';
+  }
+  container.innerHTML = html;
 }
 
-function renderConstraintSelects() {
-  const cls = getActiveClass();
-  const students = cls ? getAllStudents(cls) : [];
-  const selects = ['noNearA', 'noNearB', 'mustFrontSelect', 'mustBackSelect', 'notFrontSelect', 'notBackSelect'];
-  selects.forEach(id => {
-    const sel = document.getElementById(id);
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">選擇學生</option>';
-    students.forEach(s => {
-      sel.innerHTML += '<option value="' + s + '">' + s + '</option>';
-    });
-    if (students.includes(prev)) sel.value = prev;
-  });
-}
+// Keep these for backward compat with renderAll calls
+function renderConstraints() { renderConstraintUI(); }
+function renderConstraintSelects() { /* replaced by renderStudentPicker */ }
 
 // ============================================================
 // Part 4: Event Handlers & Initialization
 // ============================================================
 
+function findSeatEl(seatKey, contextId) {
+  return document.querySelector('.seat[data-seat="' + seatKey + '"][data-context="' + contextId + '"]');
+}
+
+function updateSeatEl(el, student) {
+  if (!el) return;
+  const gender = getStudentGender(student);
+  el.className = 'seat ' + gender;
+  el.textContent = student || '';
+}
+
+function setSeatSelected(el, on) {
+  if (!el) return;
+  if (on) el.classList.add('selected');
+  else el.classList.remove('selected');
+}
+
 function handleSeatClick(seatKey, contextId) {
   if (!selectedSeat) {
-    // Select this seat
     selectedSeat = { key: seatKey, context: contextId };
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), true);
     return;
   }
 
   if (selectedSeat.key === seatKey && selectedSeat.context === contextId) {
-    // Deselect
     selectedSeat = null;
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), false);
     return;
   }
 
   if (selectedSeat.context !== contextId) {
-    // Different context - switch selection
-    const oldCtx = selectedSeat.context;
+    setSeatSelected(findSeatEl(selectedSeat.key, selectedSeat.context), false);
     selectedSeat = { key: seatKey, context: contextId };
-    rerenderContext(oldCtx);
-    rerenderContext(contextId);
+    setSeatSelected(findSeatEl(seatKey, contextId), true);
     return;
   }
 
@@ -1368,15 +1475,20 @@ function handleSeatClick(seatKey, contextId) {
   const tableB = getSeatTableId(seatKey);
   const idxB = getSeatIndex(seatKey);
 
+  const prevEl = findSeatEl(selectedSeat.key, contextId);
+  const currEl = findSeatEl(seatKey, contextId);
+
   if (assignment[tableA] && assignment[tableB]) {
-    const temp = assignment[tableA][idxA];
+    const tmp = assignment[tableA][idxA];
     assignment[tableA][idxA] = assignment[tableB][idxB];
-    assignment[tableB][idxB] = temp;
+    assignment[tableB][idxB] = tmp;
   }
 
+  // Update only the two swapped seats in place (no full re-render)
+  updateSeatEl(prevEl, assignment[tableA][idxA]);
+  updateSeatEl(currEl, assignment[tableB][idxB]);
   selectedSeat = null;
   saveState();
-  rerenderContext(contextId);
 }
 
 function getAssignmentForContext(contextId) {
@@ -1384,14 +1496,6 @@ function getAssignmentForContext(contextId) {
   const temp = state.tempArrangements.find(t => t.id === contextId);
   if (temp) return temp.assignment;
   return null;
-}
-
-function rerenderContext(contextId) {
-  if (contextId === 'main') {
-    renderMainSeating();
-  } else {
-    renderTempList();
-  }
 }
 
 function loadTemp(tempId) {
@@ -1425,6 +1529,7 @@ function loadSaved(arrId) {
   const arr = state.savedArrangements.find(a => a.id === arrId);
   if (!arr) return;
   state.currentAssignment = deepCopy(arr.assignment);
+  state.currentConstraintLevel = arr.constraintLevel || null;
   state.tempArrangements = arr.tempArrangements ? deepCopy(arr.tempArrangements) : [];
   if (arr.layoutSnapshot) {
     state.layout = deepCopy(arr.layoutSnapshot);
@@ -1433,7 +1538,7 @@ function loadSaved(arrId) {
   saveState();
   switchTab(1);
   renderAll();
-  document.getElementById('levelInfo').classList.remove('visible');
+  showLevelInfo(state.currentConstraintLevel);
 }
 
 function deleteSaved(arrId) {
