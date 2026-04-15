@@ -151,7 +151,25 @@ button:active { transform: scale(0.97); }
 .data-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .layout-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
 .layout-controls > div { display: flex; flex-direction: column; gap: 4px; }
-.layout-controls input[type="number"] { width: 60px; }
+.num-stepper {
+  display: flex; align-items: center; gap: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  overflow: hidden; background: var(--bg-input);
+}
+.num-stepper button {
+  width: 34px; height: 34px; border: none; border-radius: 0;
+  background: var(--bg-input); color: var(--text);
+  font-size: 1.1rem; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.num-stepper button:first-child { border-right: 1px solid var(--border); }
+.num-stepper button:last-child { border-left: 1px solid var(--border); }
+.num-stepper button:active { background: var(--accent-light); }
+.num-stepper span {
+  min-width: 36px; text-align: center; font-size: 0.95rem;
+  font-weight: 600; color: var(--text); user-select: none;
+}
 .layout-options { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
 .layout-options label {
   display: flex; align-items: center; gap: 6px;
@@ -437,9 +455,9 @@ button:active { transform: scale(0.97); }
     <section class="section">
       <h2>教室配置</h2>
       <div class="layout-controls">
-        <div><label>縱列組數</label><input type="number" id="layoutColumns" min="1" max="6" value="2" onchange="onLayoutChange()"></div>
-        <div><label>每組行數</label><input type="number" id="layoutRows" min="1" max="10" value="3" onchange="onLayoutChange()"></div>
-        <div><label>每桌人數</label><input type="number" id="defaultSeats" min="1" max="8" value="3" onchange="onDefaultSeatsChange()"></div>
+        <div><label>縱列組數</label><div class="num-stepper"><button onclick="adjustLayout('columns',-1)">−</button><span id="layoutColumnsVal">2</span><button onclick="adjustLayout('columns',1)">+</button></div></div>
+        <div><label>每組行數</label><div class="num-stepper"><button onclick="adjustLayout('rows',-1)">−</button><span id="layoutRowsVal">3</span><button onclick="adjustLayout('rows',1)">+</button></div></div>
+        <div><label>每桌人數</label><div class="num-stepper"><button onclick="adjustDefaultSeats(-1)">−</button><span id="defaultSeatsVal">3</span><button onclick="adjustDefaultSeats(1)">+</button></div></div>
       </div>
       <div class="layout-options">
         <label><input type="checkbox" id="allowEmpty" onchange="onSettingsChange()"> 允許空桌</label>
@@ -622,28 +640,32 @@ function importJSON(event) {
 }
 
 // --- Layout Management ---
-function onLayoutChange() {
-  const cols = parseInt(document.getElementById('layoutColumns').value) || 2;
-  const rows = parseInt(document.getElementById('layoutRows').value) || 3;
-  state.layout.columns = cols;
-  state.layout.rows = rows;
+let defaultSeats = 3;
+
+function adjustLayout(field, delta) {
+  if (field === 'columns') {
+    state.layout.columns = Math.max(1, Math.min(6, state.layout.columns + delta));
+  } else {
+    state.layout.rows = Math.max(1, Math.min(10, state.layout.rows + delta));
+  }
   // Remove tables that fall outside new grid dimensions
   state.layout.tables = state.layout.tables.filter(
-    t => t.columnGroup < cols && t.row < rows
+    t => t.columnGroup < state.layout.columns && t.row < state.layout.rows
   );
   saveState();
+  renderLayoutControls();
   renderLayoutPreview();
 }
 
-function onDefaultSeatsChange() {
-  // Only affects newly added tables; existing tables unchanged
-  saveState();
+function adjustDefaultSeats(delta) {
+  defaultSeats = Math.max(1, Math.min(8, defaultSeats + delta));
+  document.getElementById('defaultSeatsVal').textContent = defaultSeats;
 }
 
 function addTable(cg, row) {
   const existing = state.layout.tables.find(t => t.columnGroup === cg && t.row === row);
   if (existing) return;
-  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
+  const seats = defaultSeats;
   state.layout.tables.push({
     id: 't' + cg + '_' + row,
     columnGroup: cg,
@@ -1219,11 +1241,9 @@ function renderClassForm() {
 }
 
 function renderLayoutControls() {
-  document.getElementById('layoutColumns').value = state.layout.columns;
-  document.getElementById('layoutRows').value = state.layout.rows;
-  if (state.layout.tables.length > 0) {
-    document.getElementById('defaultSeats').value = state.layout.tables[0].seats;
-  }
+  document.getElementById('layoutColumnsVal').textContent = state.layout.columns;
+  document.getElementById('layoutRowsVal').textContent = state.layout.rows;
+  document.getElementById('defaultSeatsVal').textContent = defaultSeats;
   document.getElementById('allowEmpty').checked = state.settings.allowEmptyTables;
   document.getElementById('balanceLR').checked = state.settings.balanceLeftRight;
 }
