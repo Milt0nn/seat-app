@@ -195,7 +195,7 @@ button:active { transform: scale(0.97); }
 }
 .classroom-row {
   display: grid; gap: 20px;
-  justify-items: center; align-items: start;
+  justify-items: center; align-items: center;
 }
 .table-unit {
   display: flex; background: var(--bg-input);
@@ -1267,7 +1267,7 @@ function renderLayoutPreview() {
     return;
   }
   const tables = state.layout.tables;
-  const rowStyle = 'grid-template-columns:repeat(' + cols + ',1fr)';
+  const rowStyle = 'grid-template-columns:repeat(' + cols + ',auto)';
   let html = '<div class="classroom-container">';
   html += '<div class="classroom-grid">';
   html += '<div class="podium">講台</div>';
@@ -1304,6 +1304,7 @@ function renderLayoutPreview() {
   html += '</div>';
   html += '</div>';
   container.innerHTML = html;
+  equalizeGridColumns();
 }
 
 function renderClassroomHTML(assignment, contextId, mini) {
@@ -1314,7 +1315,7 @@ function renderClassroomHTML(assignment, contextId, mini) {
   const gridCls = mini ? '' : 'classroom-grid';
   const miniCls = mini ? ' mini-classroom' : '';
   const containerId = 'cc_' + contextId.replace(/[^a-zA-Z0-9_]/g, '');
-  const rowStyle = 'grid-template-columns:repeat(' + cols + ',1fr)';
+  const rowStyle = 'grid-template-columns:repeat(' + cols + ',auto)';
 
   let html = '<div class="classroom-container" id="' + containerId + '">';
   html += '<div class="' + gridCls + miniCls + '">';
@@ -1350,6 +1351,29 @@ function renderClassroomHTML(assignment, contextId, mini) {
   return html;
 }
 
+function equalizeGridColumns() {
+  document.querySelectorAll('.classroom-grid, .mini-classroom').forEach(function(grid) {
+    const rows = grid.querySelectorAll('.classroom-row');
+    let maxW = 0;
+    rows.forEach(function(row) {
+      row.style.gridTemplateColumns = row.style.gridTemplateColumns.replace(/\d+px/g, 'auto');
+    });
+    requestAnimationFrame(function() {
+      rows.forEach(function(row) {
+        Array.from(row.children).forEach(function(cell) {
+          maxW = Math.max(maxW, cell.offsetWidth);
+        });
+      });
+      if (maxW > 0) {
+        rows.forEach(function(row) {
+          var n = row.children.length;
+          row.style.gridTemplateColumns = 'repeat(' + n + ',' + maxW + 'px)';
+        });
+      }
+    });
+  });
+}
+
 function renderMainSeating() {
   const container = document.getElementById('mainSeating');
   if (!state.currentAssignment) {
@@ -1357,6 +1381,7 @@ function renderMainSeating() {
     return;
   }
   container.innerHTML = renderClassroomHTML(state.currentAssignment, 'main', false);
+  equalizeGridColumns();
 }
 
 function renderTempList() {
@@ -1378,6 +1403,7 @@ function renderTempList() {
     html += '</div>';
   });
   container.innerHTML = html;
+  equalizeGridColumns();
 }
 
 function renderSavedList() {
@@ -1403,6 +1429,7 @@ function renderSavedList() {
     html += '</div>';
   });
   container.innerHTML = html;
+  equalizeGridColumns();
 }
 
 function renderConstraintUI() {
