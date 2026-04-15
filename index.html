@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>教室座位安排</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-input: #f8f9fa;
+  --text: #1a1a1a;
+  --text-secondary: #666;
+  --border: #ddd;
+  --accent: #4a90d9;
+  --accent-light: #e8f0fe;
+  --danger: #e74c3c;
+  --danger-light: #fdecea;
+  --success: #27ae60;
+  --boy: #bbdefb;
+  --boy-text: #1565c0;
+  --girl: #f8bbd0;
+  --girl-text: #c62828;
+  --empty: #e0e0e0;
+  --selected: #ffd54f;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --radius: 10px;
+}
+[data-theme="dark"] {
+  --bg: #121212;
+  --bg-card: #1e1e1e;
+  --bg-input: #2a2a2a;
+  --text: #e0e0e0;
+  --text-secondary: #aaa;
+  --border: #444;
+  --accent: #5b9bd5;
+  --accent-light: #1e3a5f;
+  --danger: #ef5350;
+  --danger-light: #3e1a1a;
+  --success: #66bb6a;
+  --boy: #1e3a5f;
+  --boy-text: #90caf9;
+  --girl: #4a1a2e;
+  --girl-text: #f48fb1;
+  --empty: #333;
+  --selected: #f9a825;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+header {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+header h1 { font-size: 1.1rem; font-weight: 600; }
+.dark-toggle {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: 0.85rem; color: #fff; user-select: none;
+}
+.dark-toggle input { display: none; }
+.toggle-track {
+  width: 40px; height: 22px; border-radius: 11px;
+  background: rgba(255,255,255,0.3); position: relative;
+  transition: background 0.2s;
+}
+.toggle-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s;
+}
+.dark-toggle input:checked + .toggle-track {
+  background: rgba(255,255,255,0.5);
+}
+.dark-toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+}
+.tab-bar {
+  display: flex; background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 48px; z-index: 99;
+}
+.tab-btn {
+  flex: 1; padding: 12px 8px; border: none;
+  background: none; color: var(--text-secondary);
+  font-size: 0.95rem; font-weight: 500;
+  cursor: pointer; transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-content { display: none; padding: 12px; padding-bottom: 40px; }
+.tab-content.active { display: block; }
+.section {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.section h2 {
+  font-size: 1rem; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+  color: var(--accent);
+}
+.section h3 {
+  font-size: 0.9rem; margin: 12px 0 8px;
+  color: var(--text-secondary);
+}
+label { font-size: 0.85rem; color: var(--text-secondary); }
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 0.9rem;
+  background: var(--bg-input); color: var(--text);
+  outline: none; transition: border-color 0.2s;
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+}
+input[type="number"] { width: 70px; text-align: center; }
+textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+button {
+  padding: 8px 16px; border: none; border-radius: 6px;
+  font-size: 0.85rem; cursor: pointer; font-weight: 500;
+  transition: all 0.15s; color: var(--text);
+  background: var(--bg-input); border: 1px solid var(--border);
+}
+button:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.btn-danger {
+  background: var(--danger); color: #fff; border-color: var(--danger);
+}
+.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+.btn-block { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 0; }
+.gender-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.gender-inputs > div > label { display: block; margin-bottom: 4px; font-weight: 500; }
+.data-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.layout-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.layout-controls > div { display: flex; flex-direction: column; gap: 4px; }
+.layout-controls input[type="number"] { width: 60px; }
+.layout-options { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.layout-options label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; cursor: pointer;
+}
+.layout-options input[type="checkbox"] {
+  width: 18px; height: 18px; accent-color: var(--accent);
+}
+/* Classroom grid */
+.classroom-grid { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.podium {
+  background: var(--accent-light); color: var(--accent);
+  padding: 6px 40px; border-radius: 6px; text-align: center;
+  font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;
+}
+.classroom-row {
+  display: flex; gap: 20px; justify-content: center; align-items: flex-start;
+}
+.table-unit {
+  display: flex; background: var(--bg-input);
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 6px; gap: 4px; position: relative;
+  transition: border-color 0.2s;
+}
+.table-unit.horizontal { flex-direction: row; }
+.table-unit.vertical { flex-direction: column; }
+.seat {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 500;
+  cursor: pointer; user-select: none;
+  transition: all 0.15s; text-align: center;
+  line-height: 1.2; word-break: break-all;
+  border: 2px solid transparent;
+}
+.seat.boy { background: var(--boy); color: var(--boy-text); }
+.seat.girl { background: var(--girl); color: var(--girl-text); }
+.seat.empty-seat { background: var(--empty); color: var(--text-secondary); }
+.seat.selected {
+  border-color: var(--selected) !important;
+  box-shadow: 0 0 0 3px var(--selected);
+  transform: scale(1.08);
+}
+.seat:active { transform: scale(0.95); }
+/* Table config overlay */
+.table-config {
+  display: flex; gap: 4px; margin-top: 4px;
+  justify-content: center; align-items: center;
+}
+.table-config button {
+  width: 24px; height: 24px; padding: 0;
+  font-size: 0.75rem; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+}
+.table-config span { font-size: 0.75rem; min-width: 20px; text-align: center; }
+/* Preview table wrapper */
+.table-wrapper {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.orientation-btn {
+  font-size: 0.7rem; padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-light); color: var(--accent);
+  border: 1px solid var(--accent); cursor: pointer;
+}
+/* Chips */
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 0.8rem; background: var(--accent-light);
+  color: var(--accent);
+}
+.chip .remove {
+  cursor: pointer; font-size: 1rem; line-height: 1;
+  opacity: 0.7; margin-left: 2px;
+}
+.chip .remove:hover { opacity: 1; }
+/* Constraint add row */
+.constraint-row {
+  display: flex; gap: 6px; align-items: center;
+  flex-wrap: wrap; margin-bottom: 6px;
+}
+.constraint-row select { width: auto; flex: 1; min-width: 80px; }
+.constraint-row .arrow { flex: 0; font-size: 1.1rem; color: var(--text-secondary); }
+/* Seating controls */
+.seating-controls {
+  display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.level-info {
+  font-size: 0.8rem; color: var(--text-secondary);
+  margin-bottom: 8px; padding: 6px 10px;
+  background: var(--accent-light); border-radius: 6px;
+  display: none;
+}
+.level-info.visible { display: block; }
+/* Saved / Temp cards */
+.arrangement-card {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; margin-bottom: 10px;
+}
+.arrangement-card .card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.arrangement-card .card-header h4 {
+  font-size: 0.9rem; margin: 0; color: var(--text);
+}
+.arrangement-card .card-header span {
+  font-size: 0.75rem; color: var(--text-secondary);
+}
+.card-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* Mini classroom for saved/temp */
+.mini-classroom .classroom-row { gap: 10px; }
+.mini-classroom .seat {
+  width: 36px; height: 36px; font-size: 0.6rem;
+}
+.mini-classroom .table-unit { padding: 4px; gap: 2px; }
+.mini-classroom .podium { padding: 4px 20px; font-size: 0.75rem; margin-bottom: 4px; }
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 200;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 20px; width: 100%; max-width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal h3 { margin-bottom: 12px; font-size: 1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 24px;
+  color: var(--text-secondary); font-size: 0.9rem;
+}
+/* Responsive */
+@media (max-width: 480px) {
+  .classroom-row { gap: 10px; }
+  .seat { width: 40px; height: 40px; font-size: 0.65rem; }
+  .mini-classroom .seat { width: 30px; height: 30px; font-size: 0.55rem; }
+  .gender-inputs { grid-template-columns: 1fr; }
+}
+@media (min-width: 768px) {
+  .tab-content { max-width: 720px; margin: 0 auto; }
+}
+/* Print */
+@media print {
+  header, .tab-bar, .seating-controls, .card-actions,
+  .constraint-row, .data-buttons, .layout-controls,
+  .layout-options, .orientation-btn, .table-config,
+  .section:not(#seatingSection), button { display: none !important; }
+  .tab-content { display: block !important; padding: 0; }
+  .section { box-shadow: none; border: none; }
+  .seat { border: 1px solid #999 !important; }
+}
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn 0.25s ease-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>教室座位安排</h1>
+  <label class="dark-toggle">
+    <span>深色</span>
+    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+    <span class="toggle-track"></span>
+  </label>
+</header>
+
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab(0)">班級與教室</button>
+  <button class="tab-btn" onclick="switchTab(1)">座位安排</button>
+</nav>
+
+<main>
+  <!-- Tab 0: 班級與教室 -->
+  <div class="tab-content active" id="tab0">
+    <section class="section">
+      <h2>班級名冊</h2>
+      <div class="row" style="margin-bottom:10px">
+        <select id="classSelect" onchange="onClassChange()"></select>
+        <button onclick="createClass()" class="btn-sm">新增</button>
+        <button onclick="deleteClass()" class="btn-sm btn-danger">刪除</button>
+      </div>
+      <div style="margin-bottom:10px">
+        <label>班級名稱</label>
+        <input type="text" id="className" placeholder="例：三年甲班" oninput="onClassNameChange()">
+      </div>
+      <div class="gender-inputs">
+        <div>
+          <label>男生 (<span id="boyCount">0</span>人)</label>
+          <textarea id="boysInput" placeholder="每行一位學生姓名" oninput="onRosterChange()"></textarea>
+        </div>
+        <div>
+          <label>女生 (<span id="girlCount">0</span>人)</label>
+          <textarea id="girlsInput" placeholder="每行一位學生姓名" oninput="onRosterChange()"></textarea>
+        </div>
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px">
+        合計：<span id="totalCount">0</span> 人
+      </div>
+      <div class="data-buttons">
+        <button onclick="exportJSON()">匯出 JSON</button>
+        <button onclick="document.getElementById('importFile').click()">匯入 JSON</button>
+        <input type="file" id="importFile" accept=".json" onchange="importJSON(event)" hidden>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>教室配置</h2>
+      <div class="layout-controls">
+        <div><label>縱列組數</label><input type="number" id="layoutColumns" min="1" max="6" value="2" onchange="onLayoutChange()"></div>
+        <div><label>每組行數</label><input type="number" id="layoutRows" min="1" max="10" value="3" onchange="onLayoutChange()"></div>
+        <div><label>每桌人數</label><input type="number" id="defaultSeats" min="1" max="8" value="3" onchange="onDefaultSeatsChange()"></div>
+      </div>
+      <div class="layout-options">
+        <label><input type="checkbox" id="allowEmpty" onchange="onSettingsChange()"> 允許空桌</label>
+        <label><input type="checkbox" id="balanceLR" onchange="onSettingsChange()"> 左右人數相近</label>
+      </div>
+      <div id="layoutPreview"></div>
+    </section>
+
+    <section class="section">
+      <h2>儲存記錄</h2>
+      <div id="savedList"></div>
+    </section>
+  </div>
+
+  <!-- Tab 1: 座位安排 -->
+  <div class="tab-content" id="tab1">
+    <section class="section">
+      <h2>限制條件</h2>
+      <h3>不可相鄰</h3>
+      <div class="constraint-row">
+        <select id="noNearA"></select>
+        <span class="arrow">↔</span>
+        <select id="noNearB"></select>
+        <button onclick="addNoNearby()" class="btn-sm btn-primary">新增</button>
+      </div>
+      <div id="noNearbyList" class="chip-list"></div>
+
+      <h3>必須坐前排</h3>
+      <div class="constraint-row">
+        <select id="mustFrontSelect"></select>
+        <button onclick="addRowConstraint('mustFrontRow')" class="btn-sm btn-primary">新增</button>
+      </div>
+      <div id="mustFrontList" class="chip-list"></div>
+
+      <h3>必須坐後排</h3>
+      <div class="constraint-row">
+        <select id="mustBackSelect"></select>
+        <button onclick="addRowConstraint('mustBackRow')" class="btn-sm btn-primary">新增</button>
+      </div>
+      <div id="mustBackList" class="chip-list"></div>
+
+      <h3>不可坐前排</h3>
+      <div class="constraint-row">
+        <select id="notFrontSelect"></select>
+        <button onclick="addRowConstraint('notFrontRow')" class="btn-sm btn-primary">新增</button>
+      </div>
+      <div id="notFrontList" class="chip-list"></div>
+
+      <h3>不可坐後排</h3>
+      <div class="constraint-row">
+        <select id="notBackSelect"></select>
+        <button onclick="addRowConstraint('notBackRow')" class="btn-sm btn-primary">新增</button>
+      </div>
+      <div id="notBackList" class="chip-list"></div>
+    </section>
+
+    <section class="section" id="seatingSection">
+      <h2>座位表</h2>
+      <div class="seating-controls">
+        <button onclick="randomizeSeats()" class="btn-primary">隨機排座位</button>
+        <button onclick="openSaveModal()">儲存方案</button>
+      </div>
+      <div id="levelInfo" class="level-info"></div>
+      <div id="mainSeating"></div>
+    </section>
+
+    <section class="section">
+      <h2>暫存座位表</h2>
+      <div id="tempList"></div>
+    </section>
+  </div>
+</main>
+
+<!-- Save modal -->
+<div class="modal-overlay" id="saveModal">
+  <div class="modal">
+    <h3>儲存座位方案</h3>
+    <label>方案名稱</label>
+    <input type="text" id="saveName" placeholder="例：第一次換座位">
+    <div class="modal-actions">
+      <button onclick="closeSaveModal()">取消</button>
+      <button onclick="confirmSave()" class="btn-primary">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="confirmTitle">確認</h3>
+    <p id="confirmMsg" style="font-size:0.9rem;color:var(--text-secondary)"></p>
+    <div class="modal-actions">
+      <button onclick="closeConfirmModal()">取消</button>
+      <button onclick="confirmAction()" class="btn-danger">確認</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Part 1: State Management, Utilities, Persistence, Layout
+// ============================================================
+const STORAGE_KEY = 'seatApp_v2';
+
+let state = {
+  classes: [],
+  activeClassId: null,
+  layout: { columns: 2, rows: 3, tables: [] },
+  settings: { allowEmptyTables: false, balanceLeftRight: false, darkMode: false },
+  savedArrangements: [],
+  tempArrangements: [],
+  currentAssignment: null
+};
+
+let selectedSeat = null; // { key: 'tX_Y', context: 'main' | tempId }
+let pendingConfirmAction = null;
+
+// --- Utilities ---
+function genId() { return '_' + Math.random().toString(36).substr(2, 9); }
+function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+function getActiveClass() {
+  return state.classes.find(c => c.id === state.activeClassId) || null;
+}
+
+function getAllStudents(cls) {
+  if (!cls) cls = getActiveClass();
+  if (!cls) return [];
+  return [...cls.boys, ...cls.girls];
+}
+
+function getStudentGender(name) {
+  const cls = getActiveClass();
+  if (!cls || !name) return 'empty-seat';
+  if (cls.boys.includes(name)) return 'boy';
+  if (cls.girls.includes(name)) return 'girl';
+  return 'empty-seat';
+}
+
+function parseNames(text) {
+  return text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+function getTotalSeats() {
+  return state.layout.tables.reduce((sum, t) => sum + t.seats, 0);
+}
+
+function getFrontRowTables() {
+  return state.layout.tables.filter(t => t.row === 0);
+}
+
+function getBackRowTables() {
+  const maxRow = Math.max(...state.layout.tables.map(t => t.row), 0);
+  return state.layout.tables.filter(t => t.row === maxRow);
+}
+
+function getSeatTableId(seatKey) {
+  const parts = seatKey.split('_s');
+  return parts[0];
+}
+
+function getSeatIndex(seatKey) {
+  const parts = seatKey.split('_s');
+  return parseInt(parts[1]);
+}
+
+// --- Persistence ---
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      Object.assign(state, data);
+    }
+  } catch(e) {}
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'seat-app-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.classes && data.layout) {
+        Object.assign(state, data);
+        saveState();
+        renderAll();
+        alert('匯入成功！');
+      } else {
+        alert('匯入失敗：檔案格式不正確');
+      }
+    } catch(err) {
+      alert('匯入失敗：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// --- Layout Management ---
+function generateTables(cols, rows, defaultSeats) {
+  const tables = [];
+  for (let cg = 0; cg < cols; cg++) {
+    for (let r = 0; r < rows; r++) {
+      tables.push({
+        id: 't' + cg + '_' + r,
+        columnGroup: cg,
+        row: r,
+        seats: defaultSeats || 3,
+        orientation: 'horizontal'
+      });
+    }
+  }
+  return tables;
+}
+
+function rebuildLayout() {
+  const cols = parseInt(document.getElementById('layoutColumns').value) || 2;
+  const rows = parseInt(document.getElementById('layoutRows').value) || 3;
+  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
+  state.layout.columns = cols;
+  state.layout.rows = rows;
+  state.layout.tables = generateTables(cols, rows, seats);
+  saveState();
+  renderLayoutPreview();
+}
+
+function onLayoutChange() {
+  rebuildLayout();
+}
+
+function onDefaultSeatsChange() {
+  const seats = parseInt(document.getElementById('defaultSeats').value) || 3;
+  state.layout.tables.forEach(t => { t.seats = seats; });
+  saveState();
+  renderLayoutPreview();
+}
+
+function changeTableSeats(tableId, delta) {
+  const table = state.layout.tables.find(t => t.id === tableId);
+  if (!table) return;
+  table.seats = Math.max(1, Math.min(8, table.seats + delta));
+  saveState();
+  renderLayoutPreview();
+}
+
+function toggleOrientation(tableId) {
+  const table = state.layout.tables.find(t => t.id === tableId);
+  if (!table) return;
+  table.orientation = table.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+  saveState();
+  renderLayoutPreview();
+}
+
+// --- Class Management ---
+function createClass() {
+  const name = '新班級';
+  const cls = {
+    id: genId(),
+    name: name,
+    boys: [],
+    girls: [],
+    constraints: {
+      noNearby: [],
+      mustFrontRow: [],
+      mustBackRow: [],
+      notFrontRow: [],
+      notBackRow: []
+    }
+  };
+  state.classes.push(cls);
+  state.activeClassId = cls.id;
+  saveState();
+  renderAll();
+}
+
+function deleteClass() {
+  if (!state.activeClassId) return;
+  const cls = getActiveClass();
+  if (!cls) return;
+  pendingConfirmAction = function() {
+    state.classes = state.classes.filter(c => c.id !== state.activeClassId);
+    state.activeClassId = state.classes.length > 0 ? state.classes[0].id : null;
+    saveState();
+    renderAll();
+  };
+  document.getElementById('confirmTitle').textContent = '刪除班級';
+  document.getElementById('confirmMsg').textContent = '確定要刪除「' + cls.name + '」嗎？';
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+function onClassChange() {
+  state.activeClassId = document.getElementById('classSelect').value;
+  saveState();
+  renderClassForm();
+  renderConstraints();
+  renderConstraintSelects();
+}
+
+function onClassNameChange() {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.name = document.getElementById('className').value;
+  saveState();
+  // Update dropdown
+  const opt = document.querySelector('#classSelect option[value="' + cls.id + '"]');
+  if (opt) opt.textContent = cls.name;
+}
+
+function onRosterChange() {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.boys = parseNames(document.getElementById('boysInput').value);
+  cls.girls = parseNames(document.getElementById('girlsInput').value);
+  document.getElementById('boyCount').textContent = cls.boys.length;
+  document.getElementById('girlCount').textContent = cls.girls.length;
+  document.getElementById('totalCount').textContent = cls.boys.length + cls.girls.length;
+  // Clean up constraints referencing removed students
+  const allNames = getAllStudents(cls);
+  cls.constraints.noNearby = cls.constraints.noNearby.filter(
+    pair => allNames.includes(pair[0]) && allNames.includes(pair[1])
+  );
+  ['mustFrontRow','mustBackRow','notFrontRow','notBackRow'].forEach(key => {
+    cls.constraints[key] = cls.constraints[key].filter(n => allNames.includes(n));
+  });
+  saveState();
+  renderConstraints();
+  renderConstraintSelects();
+}
+
+function onSettingsChange() {
+  state.settings.allowEmptyTables = document.getElementById('allowEmpty').checked;
+  state.settings.balanceLeftRight = document.getElementById('balanceLR').checked;
+  saveState();
+}
+
+// --- Dark Mode ---
+function toggleDarkMode() {
+  state.settings.darkMode = document.getElementById('darkModeToggle').checked;
+  document.documentElement.setAttribute('data-theme', state.settings.darkMode ? 'dark' : 'light');
+  saveState();
+}
+
+// --- Tab Switching ---
+function switchTab(idx) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('.tab-content').forEach((tab, i) => {
+    tab.classList.toggle('active', i === idx);
+  });
+  if (idx === 1) {
+    renderConstraints();
+    renderConstraintSelects();
+    renderMainSeating();
+    renderTempList();
+  }
+}
+
+// --- Modals ---
+function openSaveModal() {
+  if (!state.currentAssignment) {
+    alert('尚未產生座位表');
+    return;
+  }
+  document.getElementById('saveName').value = '';
+  document.getElementById('saveModal').classList.add('active');
+}
+function closeSaveModal() {
+  document.getElementById('saveModal').classList.remove('active');
+}
+function closeConfirmModal() {
+  document.getElementById('confirmModal').classList.remove('active');
+  pendingConfirmAction = null;
+}
+function confirmAction() {
+  if (pendingConfirmAction) pendingConfirmAction();
+  closeConfirmModal();
+}
+function confirmSave() {
+  const name = document.getElementById('saveName').value.trim() || '未命名方案';
+  const arrangement = {
+    id: genId(),
+    classId: state.activeClassId,
+    name: name,
+    timestamp: Date.now(),
+    layoutSnapshot: deepCopy(state.layout),
+    assignment: deepCopy(state.currentAssignment),
+    tempArrangements: deepCopy(state.tempArrangements)
+  };
+  state.savedArrangements.push(arrangement);
+  saveState();
+  closeSaveModal();
+  renderSavedList();
+  alert('已儲存方案「' + name + '」');
+}
+
+// --- Constraint Management ---
+function addNoNearby() {
+  const cls = getActiveClass();
+  if (!cls) return;
+  const a = document.getElementById('noNearA').value;
+  const b = document.getElementById('noNearB').value;
+  if (!a || !b || a === b) return;
+  const exists = cls.constraints.noNearby.some(
+    p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a)
+  );
+  if (exists) return;
+  cls.constraints.noNearby.push([a, b]);
+  saveState();
+  renderConstraints();
+}
+
+function removeNoNearby(idx) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.constraints.noNearby.splice(idx, 1);
+  saveState();
+  renderConstraints();
+}
+
+function addRowConstraint(type) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  const selectId = {
+    mustFrontRow: 'mustFrontSelect',
+    mustBackRow: 'mustBackSelect',
+    notFrontRow: 'notFrontSelect',
+    notBackRow: 'notBackSelect'
+  }[type];
+  const name = document.getElementById(selectId).value;
+  if (!name || cls.constraints[type].includes(name)) return;
+  // Remove from conflicting constraints
+  const conflicts = {
+    mustFrontRow: ['mustBackRow', 'notFrontRow'],
+    mustBackRow: ['mustFrontRow', 'notBackRow'],
+    notFrontRow: ['mustFrontRow'],
+    notBackRow: ['mustBackRow']
+  };
+  (conflicts[type] || []).forEach(ct => {
+    cls.constraints[ct] = cls.constraints[ct].filter(n => n !== name);
+  });
+  cls.constraints[type].push(name);
+  saveState();
+  renderConstraints();
+}
+
+function removeRowConstraint(type, name) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.constraints[type] = cls.constraints[type].filter(n => n !== name);
+  saveState();
+  renderConstraints();
+}
+// ============================================================
+// Part 2: Coordinate System & Seating Algorithm
+// ============================================================
+
+function computeSeatCoords(tables) {
+  const coords = {};
+  if (!tables || tables.length === 0) return coords;
+
+  // Compute column offsets
+  const maxCols = Math.max(...tables.map(t => t.columnGroup)) + 1;
+  const colOffsets = [];
+  let cx = 0;
+  for (let cg = 0; cg < maxCols; cg++) {
+    colOffsets[cg] = cx;
+    const tablesInCG = tables.filter(t => t.columnGroup === cg);
+    const maxW = Math.max(...tablesInCG.filter(t => t.orientation === 'horizontal').map(t => t.seats), 1);
+    cx += maxW + 1; // +1 aisle gap
+  }
+
+  // Compute row offsets
+  const maxRows = Math.max(...tables.map(t => t.row)) + 1;
+  const rowOffsets = [];
+  let cy = 0;
+  for (let r = 0; r < maxRows; r++) {
+    rowOffsets[r] = cy;
+    const tablesInRow = tables.filter(t => t.row === r);
+    const maxV = Math.max(...tablesInRow.filter(t => t.orientation === 'vertical').map(t => t.seats), 1);
+    cy += maxV;
+  }
+
+  for (const table of tables) {
+    for (let i = 0; i < table.seats; i++) {
+      const key = table.id + '_s' + i;
+      if (table.orientation === 'horizontal') {
+        coords[key] = { x: colOffsets[table.columnGroup] + i, y: rowOffsets[table.row] };
+      } else {
+        coords[key] = { x: colOffsets[table.columnGroup], y: rowOffsets[table.row] + i };
+      }
+    }
+  }
+  return coords;
+}
+
+function checkProximityViolation(seatKey1, seatKey2, coords, level) {
+  const c1 = coords[seatKey1];
+  const c2 = coords[seatKey2];
+  if (!c1 || !c2) return false;
+  const sameTable = getSeatTableId(seatKey1) === getSeatTableId(seatKey2);
+  const dx = Math.abs(c1.x - c2.x);
+  const dy = Math.abs(c1.y - c2.y);
+  const adjH = dy === 0 && dx === 1;
+  const adjV = dx === 0 && dy === 1;
+  const diag = dx === 1 && dy === 1;
+
+  switch (level) {
+    case 1: return sameTable || adjH || adjV || diag;
+    case 2: return sameTable || adjH || adjV;
+    case 3: return sameTable || adjH;
+    case 4: return adjH;
+    default: return false;
+  }
+}
+
+function satisfiesConstraints(student, seatKey, assignment, constraints, coords, level) {
+  for (const [s1, s2] of constraints.noNearby) {
+    const partner = (s1 === student) ? s2 : (s2 === student) ? s1 : null;
+    if (!partner) continue;
+    let partnerSeat = null;
+    for (const [sk, st] of Object.entries(assignment)) {
+      if (st === partner) { partnerSeat = sk; break; }
+    }
+    if (!partnerSeat) continue;
+    if (checkProximityViolation(seatKey, partnerSeat, coords, level)) return false;
+  }
+  return true;
+}
+
+function getGenderScore(seatKey, student, assignment, coords, cls) {
+  const myGender = cls.boys.includes(student) ? 'M' : 'F';
+  const myCoord = coords[seatKey];
+  if (!myCoord) return 0;
+  let score = 0;
+  for (const [sk, st] of Object.entries(assignment)) {
+    if (!st) continue;
+    const c = coords[sk];
+    if (!c) continue;
+    const dx = Math.abs(c.x - myCoord.x);
+    const dy = Math.abs(c.y - myCoord.y);
+    if ((dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0)) {
+      const theirGender = cls.boys.includes(st) ? 'M' : 'F';
+      if (theirGender !== myGender) score += 1;
+      else score -= 1;
+    }
+  }
+  return score;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function randomizeSeats() {
+  const cls = getActiveClass();
+  if (!cls) { alert('請先建立班級並輸入學生名單'); return; }
+  const students = getAllStudents(cls);
+  if (students.length === 0) { alert('班級名單為空'); return; }
+  const totalSeats = getTotalSeats();
+  if (students.length > totalSeats && !state.settings.allowEmptyTables) {
+    alert('學生人數 (' + students.length + ') 超過座位數 (' + totalSeats + ')，請調整教室配置或允許空桌');
+    return;
+  }
+
+  // Auto-save current to temp if exists
+  if (state.currentAssignment) {
+    state.tempArrangements.push({
+      id: genId(),
+      timestamp: Date.now(),
+      assignment: deepCopy(state.currentAssignment)
+    });
+  }
+
+  const tables = state.layout.tables;
+  const coords = computeSeatCoords(tables);
+  const constraints = cls.constraints;
+
+  // Build seat list
+  const allSeats = [];
+  for (const table of tables) {
+    for (let i = 0; i < table.seats; i++) {
+      allSeats.push({
+        key: table.id + '_s' + i,
+        tableId: table.id,
+        row: table.row
+      });
+    }
+  }
+
+  const maxRow = Math.max(...tables.map(t => t.row), 0);
+  const frontSeats = allSeats.filter(s => s.row === 0);
+  const backSeats = allSeats.filter(s => s.row === maxRow);
+
+  // Sort students by constraint count (most constrained first)
+  const constraintCount = {};
+  students.forEach(s => {
+    let count = 0;
+    constraints.noNearby.forEach(([a, b]) => { if (a === s || b === s) count += 2; });
+    if (constraints.mustFrontRow.includes(s)) count += 3;
+    if (constraints.mustBackRow.includes(s)) count += 3;
+    if (constraints.notFrontRow.includes(s)) count += 1;
+    if (constraints.notBackRow.includes(s)) count += 1;
+    constraintCount[s] = count;
+  });
+
+  let usedLevel = 5;
+
+  for (let level = 1; level <= 5; level++) {
+    const startTime = performance.now();
+    const timeout = level < 5 ? 300 : 5000;
+
+    const ordered = shuffle(students).sort((a, b) => (constraintCount[b] || 0) - (constraintCount[a] || 0));
+
+    // Try backtracking
+    const result = backtrack(ordered, 0, {}, allSeats, frontSeats, backSeats, constraints, coords, level, startTime, timeout, cls, maxRow);
+    if (result) {
+      // Check balance if needed
+      if (state.settings.balanceLeftRight && state.layout.columns >= 2) {
+        const leftCount = Object.entries(result).filter(([k, v]) => {
+          if (!v) return false;
+          const t = tables.find(t2 => t2.id === getSeatTableId(k));
+          return t && t.columnGroup < Math.floor(state.layout.columns / 2);
+        }).length;
+        const rightCount = Object.entries(result).filter(([k, v]) => {
+          if (!v) return false;
+          const t = tables.find(t2 => t2.id === getSeatTableId(k));
+          return t && t.columnGroup >= Math.floor(state.layout.columns / 2);
+        }).length;
+        if (Math.abs(leftCount - rightCount) > 2 && level < 5) continue;
+      }
+
+      // Convert flat assignment to table-based
+      const assignment = {};
+      for (const table of tables) {
+        assignment[table.id] = [];
+        for (let i = 0; i < table.seats; i++) {
+          assignment[table.id].push(result[table.id + '_s' + i] || null);
+        }
+      }
+      state.currentAssignment = assignment;
+      usedLevel = level;
+      break;
+    }
+  }
+
+  const levelNames = ['', '最嚴格（不可同桌、相鄰、對角線）', '允許對角線', '允許前後相鄰', '允許同桌', '無限制'];
+  const info = document.getElementById('levelInfo');
+  info.textContent = '使用限制等級：' + usedLevel + ' — ' + levelNames[usedLevel];
+  info.classList.add('visible');
+
+  saveState();
+  renderMainSeating();
+  renderTempList();
+}
+
+function backtrack(students, index, assignment, allSeats, frontSeats, backSeats, constraints, coords, level, startTime, timeout, cls, maxRow) {
+  if (performance.now() - startTime > timeout) return null;
+  if (index === students.length) return deepCopy(assignment);
+
+  const student = students[index];
+
+  // Determine candidate seats
+  let candidates = allSeats.filter(s => !(s.key in assignment));
+
+  // Apply row constraints
+  if (constraints.mustFrontRow.includes(student)) {
+    candidates = candidates.filter(s => s.row === 0);
+  }
+  if (constraints.mustBackRow.includes(student)) {
+    candidates = candidates.filter(s => s.row === maxRow);
+  }
+  if (constraints.notFrontRow.includes(student)) {
+    candidates = candidates.filter(s => s.row !== 0);
+  }
+  if (constraints.notBackRow.includes(student)) {
+    candidates = candidates.filter(s => s.row !== maxRow);
+  }
+
+  // Shuffle for randomness
+  candidates = shuffle(candidates);
+
+  // Sort by gender preference (soft)
+  candidates.sort((a, b) => {
+    return getGenderScore(b.key, student, assignment, coords, cls)
+         - getGenderScore(a.key, student, assignment, coords, cls);
+  });
+
+  for (const seat of candidates) {
+    if (!satisfiesConstraints(student, seat.key, assignment, constraints, coords, level)) continue;
+    assignment[seat.key] = student;
+    const result = backtrack(students, index + 1, assignment, allSeats, frontSeats, backSeats, constraints, coords, level, startTime, timeout, cls, maxRow);
+    if (result) return result;
+    delete assignment[seat.key];
+  }
+
+  return null;
+}
+// ============================================================
+// Part 3: Rendering Functions
+// ============================================================
+
+function renderAll() {
+  renderClassSelect();
+  renderClassForm();
+  renderLayoutControls();
+  renderLayoutPreview();
+  renderSavedList();
+  renderConstraints();
+  renderConstraintSelects();
+  renderMainSeating();
+  renderTempList();
+}
+
+function renderClassSelect() {
+  const sel = document.getElementById('classSelect');
+  sel.innerHTML = '';
+  if (state.classes.length === 0) {
+    sel.innerHTML = '<option value="">（尚無班級）</option>';
+    return;
+  }
+  state.classes.forEach(cls => {
+    const opt = document.createElement('option');
+    opt.value = cls.id;
+    opt.textContent = cls.name;
+    if (cls.id === state.activeClassId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function renderClassForm() {
+  const cls = getActiveClass();
+  const nameInput = document.getElementById('className');
+  const boysInput = document.getElementById('boysInput');
+  const girlsInput = document.getElementById('girlsInput');
+  if (!cls) {
+    nameInput.value = '';
+    boysInput.value = '';
+    girlsInput.value = '';
+    document.getElementById('boyCount').textContent = '0';
+    document.getElementById('girlCount').textContent = '0';
+    document.getElementById('totalCount').textContent = '0';
+    return;
+  }
+  nameInput.value = cls.name;
+  boysInput.value = cls.boys.join('\n');
+  girlsInput.value = cls.girls.join('\n');
+  document.getElementById('boyCount').textContent = cls.boys.length;
+  document.getElementById('girlCount').textContent = cls.girls.length;
+  document.getElementById('totalCount').textContent = cls.boys.length + cls.girls.length;
+}
+
+function renderLayoutControls() {
+  document.getElementById('layoutColumns').value = state.layout.columns;
+  document.getElementById('layoutRows').value = state.layout.rows;
+  if (state.layout.tables.length > 0) {
+    document.getElementById('defaultSeats').value = state.layout.tables[0].seats;
+  }
+  document.getElementById('allowEmpty').checked = state.settings.allowEmptyTables;
+  document.getElementById('balanceLR').checked = state.settings.balanceLeftRight;
+}
+
+function renderLayoutPreview() {
+  const container = document.getElementById('layoutPreview');
+  const tables = state.layout.tables;
+  if (tables.length === 0) {
+    container.innerHTML = '<div class="empty-state">請設定教室配置</div>';
+    return;
+  }
+  const maxRow = Math.max(...tables.map(t => t.row), 0);
+  let html = '<div class="classroom-grid">';
+  html += '<div class="podium">講台</div>';
+
+  for (let r = 0; r <= maxRow; r++) {
+    html += '<div class="classroom-row">';
+    for (let cg = 0; cg < state.layout.columns; cg++) {
+      const table = tables.find(t => t.columnGroup === cg && t.row === r);
+      if (!table) {
+        html += '<div class="table-wrapper"></div>';
+        continue;
+      }
+      html += '<div class="table-wrapper">';
+      html += '<div class="table-unit ' + table.orientation + '">';
+      for (let i = 0; i < table.seats; i++) {
+        html += '<div class="seat empty-seat" style="cursor:default"></div>';
+      }
+      html += '</div>';
+      html += '<div class="table-config">';
+      html += '<button onclick="changeTableSeats(\'' + table.id + '\',-1)">−</button>';
+      html += '<span>' + table.seats + '</span>';
+      html += '<button onclick="changeTableSeats(\'' + table.id + '\',1)">+</button>';
+      html += '<button class="orientation-btn" onclick="toggleOrientation(\'' + table.id + '\')">' +
+              (table.orientation === 'horizontal' ? '橫' : '直') + '</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderClassroomHTML(assignment, contextId, mini) {
+  const tables = state.layout.tables;
+  if (tables.length === 0) return '<div class="empty-state">尚未配置教室</div>';
+  const maxRow = Math.max(...tables.map(t => t.row), 0);
+  const cls = mini ? '' : 'classroom-grid';
+  const miniCls = mini ? ' mini-classroom' : '';
+
+  let html = '<div class="' + cls + miniCls + '">';
+  html += '<div class="podium">講台</div>';
+
+  for (let r = 0; r <= maxRow; r++) {
+    html += '<div class="classroom-row">';
+    for (let cg = 0; cg < state.layout.columns; cg++) {
+      const table = tables.find(t => t.columnGroup === cg && t.row === r);
+      if (!table) {
+        html += '<div class="table-wrapper"></div>';
+        continue;
+      }
+      html += '<div class="table-unit ' + table.orientation + '">';
+      const students = (assignment && assignment[table.id]) ? assignment[table.id] : [];
+      for (let i = 0; i < table.seats; i++) {
+        const student = students[i] || null;
+        const seatKey = table.id + '_s' + i;
+        const gender = getStudentGender(student);
+        const isSelected = selectedSeat && selectedSeat.key === seatKey && selectedSeat.context === contextId;
+        const selCls = isSelected ? ' selected' : '';
+        html += '<div class="seat ' + gender + selCls + '" data-seat="' + seatKey + '" data-context="' + contextId + '" onclick="handleSeatClick(\'' + seatKey + '\',\'' + contextId + '\')">';
+        html += (student || '');
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderMainSeating() {
+  const container = document.getElementById('mainSeating');
+  if (!state.currentAssignment) {
+    container.innerHTML = '<div class="empty-state">點擊「隨機排座位」生成座位表</div>';
+    return;
+  }
+  container.innerHTML = renderClassroomHTML(state.currentAssignment, 'main', false);
+}
+
+function renderTempList() {
+  const container = document.getElementById('tempList');
+  if (state.tempArrangements.length === 0) {
+    container.innerHTML = '<div class="empty-state">尚無暫存方案</div>';
+    return;
+  }
+  let html = '';
+  state.tempArrangements.forEach((temp, idx) => {
+    const time = new Date(temp.timestamp).toLocaleString('zh-TW');
+    html += '<div class="arrangement-card fade-in">';
+    html += '<div class="card-header"><h4>暫存 #' + (idx + 1) + '</h4><span>' + time + '</span></div>';
+    html += renderClassroomHTML(temp.assignment, temp.id, false);
+    html += '<div class="card-actions">';
+    html += '<button class="btn-sm btn-primary" onclick="loadTemp(\'' + temp.id + '\')">載入至主座位表</button>';
+    html += '<button class="btn-sm btn-danger" onclick="deleteTemp(\'' + temp.id + '\')">刪除</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderSavedList() {
+  const container = document.getElementById('savedList');
+  if (state.savedArrangements.length === 0) {
+    container.innerHTML = '<div class="empty-state">尚無儲存的方案</div>';
+    return;
+  }
+  let html = '';
+  state.savedArrangements.forEach(arr => {
+    const time = new Date(arr.timestamp).toLocaleString('zh-TW');
+    html += '<div class="arrangement-card">';
+    html += '<div class="card-header"><h4>' + arr.name + '</h4><span>' + time + '</span></div>';
+    html += renderClassroomHTML(arr.assignment, 'saved_' + arr.id, true);
+    html += '<div class="card-actions">';
+    html += '<button class="btn-sm btn-primary" onclick="loadSaved(\'' + arr.id + '\')">載入</button>';
+    html += '<button class="btn-sm btn-danger" onclick="deleteSaved(\'' + arr.id + '\')">刪除</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderConstraints() {
+  const cls = getActiveClass();
+  // No nearby
+  const nnList = document.getElementById('noNearbyList');
+  if (!cls || cls.constraints.noNearby.length === 0) {
+    nnList.innerHTML = '<span style="font-size:0.8rem;color:var(--text-secondary)">尚無設定</span>';
+  } else {
+    nnList.innerHTML = cls.constraints.noNearby.map((pair, i) =>
+      '<span class="chip">' + pair[0] + ' ↔ ' + pair[1] +
+      '<span class="remove" onclick="removeNoNearby(' + i + ')">×</span></span>'
+    ).join('');
+  }
+  // Row constraints
+  const types = [
+    { key: 'mustFrontRow', listId: 'mustFrontList' },
+    { key: 'mustBackRow', listId: 'mustBackList' },
+    { key: 'notFrontRow', listId: 'notFrontList' },
+    { key: 'notBackRow', listId: 'notBackList' }
+  ];
+  types.forEach(({ key, listId }) => {
+    const el = document.getElementById(listId);
+    if (!cls || cls.constraints[key].length === 0) {
+      el.innerHTML = '<span style="font-size:0.8rem;color:var(--text-secondary)">尚無設定</span>';
+    } else {
+      el.innerHTML = cls.constraints[key].map(name =>
+        '<span class="chip">' + name +
+        '<span class="remove" onclick="removeRowConstraint(\'' + key + '\',\'' + name + '\')">×</span></span>'
+      ).join('');
+    }
+  });
+}
+
+function renderConstraintSelects() {
+  const cls = getActiveClass();
+  const students = cls ? getAllStudents(cls) : [];
+  const selects = ['noNearA', 'noNearB', 'mustFrontSelect', 'mustBackSelect', 'notFrontSelect', 'notBackSelect'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">選擇學生</option>';
+    students.forEach(s => {
+      sel.innerHTML += '<option value="' + s + '">' + s + '</option>';
+    });
+    if (students.includes(prev)) sel.value = prev;
+  });
+}
+
+// ============================================================
+// Part 4: Event Handlers & Initialization
+// ============================================================
+
+function handleSeatClick(seatKey, contextId) {
+  if (!selectedSeat) {
+    // Select this seat
+    selectedSeat = { key: seatKey, context: contextId };
+    rerenderContext(contextId);
+    return;
+  }
+
+  if (selectedSeat.key === seatKey && selectedSeat.context === contextId) {
+    // Deselect
+    selectedSeat = null;
+    rerenderContext(contextId);
+    return;
+  }
+
+  if (selectedSeat.context !== contextId) {
+    // Different context - switch selection
+    const oldCtx = selectedSeat.context;
+    selectedSeat = { key: seatKey, context: contextId };
+    rerenderContext(oldCtx);
+    rerenderContext(contextId);
+    return;
+  }
+
+  // Same context - perform swap
+  const assignment = getAssignmentForContext(contextId);
+  if (!assignment) { selectedSeat = null; return; }
+
+  const tableA = getSeatTableId(selectedSeat.key);
+  const idxA = getSeatIndex(selectedSeat.key);
+  const tableB = getSeatTableId(seatKey);
+  const idxB = getSeatIndex(seatKey);
+
+  if (assignment[tableA] && assignment[tableB]) {
+    const temp = assignment[tableA][idxA];
+    assignment[tableA][idxA] = assignment[tableB][idxB];
+    assignment[tableB][idxB] = temp;
+  }
+
+  selectedSeat = null;
+  saveState();
+  rerenderContext(contextId);
+}
+
+function getAssignmentForContext(contextId) {
+  if (contextId === 'main') return state.currentAssignment;
+  const temp = state.tempArrangements.find(t => t.id === contextId);
+  if (temp) return temp.assignment;
+  return null;
+}
+
+function rerenderContext(contextId) {
+  if (contextId === 'main') {
+    renderMainSeating();
+  } else {
+    renderTempList();
+  }
+}
+
+function loadTemp(tempId) {
+  const temp = state.tempArrangements.find(t => t.id === tempId);
+  if (!temp) return;
+  // Save current to temp first
+  if (state.currentAssignment) {
+    state.tempArrangements.push({
+      id: genId(),
+      timestamp: Date.now(),
+      assignment: deepCopy(state.currentAssignment)
+    });
+  }
+  state.currentAssignment = deepCopy(temp.assignment);
+  state.tempArrangements = state.tempArrangements.filter(t => t.id !== tempId);
+  selectedSeat = null;
+  saveState();
+  renderMainSeating();
+  renderTempList();
+  document.getElementById('levelInfo').classList.remove('visible');
+}
+
+function deleteTemp(tempId) {
+  state.tempArrangements = state.tempArrangements.filter(t => t.id !== tempId);
+  selectedSeat = null;
+  saveState();
+  renderTempList();
+}
+
+function loadSaved(arrId) {
+  const arr = state.savedArrangements.find(a => a.id === arrId);
+  if (!arr) return;
+  state.currentAssignment = deepCopy(arr.assignment);
+  state.tempArrangements = arr.tempArrangements ? deepCopy(arr.tempArrangements) : [];
+  if (arr.layoutSnapshot) {
+    state.layout = deepCopy(arr.layoutSnapshot);
+  }
+  selectedSeat = null;
+  saveState();
+  switchTab(1);
+  renderAll();
+  document.getElementById('levelInfo').classList.remove('visible');
+}
+
+function deleteSaved(arrId) {
+  const arr = state.savedArrangements.find(a => a.id === arrId);
+  if (!arr) return;
+  pendingConfirmAction = function() {
+    state.savedArrangements = state.savedArrangements.filter(a => a.id !== arrId);
+    saveState();
+    renderSavedList();
+  };
+  document.getElementById('confirmTitle').textContent = '刪除方案';
+  document.getElementById('confirmMsg').textContent = '確定要刪除「' + arr.name + '」嗎？';
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+// --- Initialization ---
+function init() {
+  loadState();
+
+  // Apply dark mode
+  if (state.settings.darkMode) {
+    document.getElementById('darkModeToggle').checked = true;
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+
+  // If no tables, generate defaults
+  if (state.layout.tables.length === 0) {
+    state.layout.columns = 2;
+    state.layout.rows = 3;
+    state.layout.tables = generateTables(2, 3, 3);
+    saveState();
+  }
+
+  // If no classes, don't create one automatically
+  renderAll();
+}
+
+init();
+</script>
+</body>
+</html>
