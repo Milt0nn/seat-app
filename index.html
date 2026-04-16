@@ -753,10 +753,16 @@ function deleteClass() {
 
 function onClassChange() {
   state.activeClassId = document.getElementById('classSelect').value;
+  state.currentAssignment = null;
+  state.currentConstraintLevel = null;
   saveState();
   renderClassForm();
   renderConstraints();
   renderConstraintSelects();
+  renderSavedList();
+  renderMainSeating();
+  renderTempList();
+  showLevelInfo(null);
 }
 
 function onClassNameChange() {
@@ -1075,6 +1081,7 @@ function randomizeSeats() {
   if (state.currentAssignment) {
     state.tempArrangements.push({
       id: genId(),
+      classId: state.activeClassId,
       timestamp: Date.now(),
       assignment: deepCopy(state.currentAssignment)
     });
@@ -1392,12 +1399,13 @@ function renderMainSeating() {
 
 function renderTempList() {
   const container = document.getElementById('tempList');
-  if (state.tempArrangements.length === 0) {
+  const filtered = state.tempArrangements.filter(t => t.classId === state.activeClassId);
+  if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state">尚無暫存方案</div>';
     return;
   }
   let html = '';
-  state.tempArrangements.forEach((temp, idx) => {
+  filtered.forEach((temp, idx) => {
     const time = new Date(temp.timestamp).toLocaleString('zh-TW');
     html += '<div class="arrangement-card fade-in">';
     html += '<div class="card-header"><h4>暫存 #' + (idx + 1) + '</h4><span>' + time + '</span></div>';
@@ -1409,17 +1417,17 @@ function renderTempList() {
     html += '</div>';
   });
   container.innerHTML = html;
-
 }
 
 function renderSavedList() {
   const container = document.getElementById('savedList');
-  if (state.savedArrangements.length === 0) {
+  const filtered = state.savedArrangements.filter(a => a.classId === state.activeClassId);
+  if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state">尚無儲存的方案</div>';
     return;
   }
   let html = '';
-  state.savedArrangements.forEach(arr => {
+  filtered.forEach(arr => {
     const time = new Date(arr.timestamp).toLocaleString('zh-TW');
     html += '<div class="arrangement-card">';
     html += '<div class="card-header"><h4>' + arr.name + '</h4><span>' + time + '</span></div>';
@@ -1435,7 +1443,6 @@ function renderSavedList() {
     html += '</div>';
   });
   container.innerHTML = html;
-
 }
 
 function renderConstraintUI() {
@@ -1607,6 +1614,7 @@ function loadTemp(tempId) {
   if (state.currentAssignment) {
     state.tempArrangements.push({
       id: genId(),
+      classId: state.activeClassId,
       timestamp: Date.now(),
       assignment: deepCopy(state.currentAssignment)
     });
